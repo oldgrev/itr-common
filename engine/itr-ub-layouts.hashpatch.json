@@ -1,0 +1,1666 @@
+{
+ "format": "hashpatch/1",
+ "files": [
+  {
+   "path": "Engine/Shaders/Private/BasePassPixelShader.usf",
+   "sha256": "d5760e53adcc9b979bed1188beba9baa69cbe7d1ab9ad50fe32f6f9e877dcd44",
+   "edits": [
+    {
+     "line": 486,
+     "remove": [
+      "a8a3c0f9237858fc847d3f8a56934e816baf13c34b96a6d98f2e4871b5a10f08",
+      "734cbb1b88eaebbdb0a6496f21cf3110a9c977de339426ec0933a3d24c73dbdf",
+      "802497d51b724feb5ebe3a1a1726a3e744711913e72aa0f0c9b3a39d3d8d239a"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tPointIndirectLighting.R.V = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients0[0].x;"
+      },
+      {
+       "text": "\t\t\tPointIndirectLighting.G.V = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients0[1].x;"
+      },
+      {
+       "text": "\t\t\tPointIndirectLighting.B.V = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients0[2].x;"
+      }
+     ]
+    },
+    {
+     "line": 504,
+     "remove": [
+      "d47e01853cfb45ced429be71f7a8ae9ea69987bd2d2c3c85025c11e158954db2",
+      "666e2d8ef2518119686d4e650a5618f9fd7fd574ad94ce200809e01953dbf01a",
+      "8a92da6cf9efa99c8d3c506e6373ad157d1e8c98aee248d283767a678511dc69"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tPointIndirectLighting.R.V0 = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients0[0];"
+      },
+      {
+       "text": "\t\t\tPointIndirectLighting.R.V1 = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients1[0];"
+      },
+      {
+       "text": "\t\t\tPointIndirectLighting.R.V2 = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients2[0];"
+      }
+     ]
+    },
+    {
+     "line": 508,
+     "remove": [
+      "6a0bc64c53fd904d731485241ffbf10ed6927785bf45a0e2ab99c06440086f85",
+      "7985d2e6f64b27a62c65af7aacbfe4ae87917d889c49bd156e816f66c8a728cc",
+      "1e21c53cf80be0942a1c3347cbff93b0a3fd69101a181f27b73c8adb0e64c79d"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tPointIndirectLighting.G.V0 = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients0[1];"
+      },
+      {
+       "text": "\t\t\tPointIndirectLighting.G.V1 = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients1[1];"
+      },
+      {
+       "text": "\t\t\tPointIndirectLighting.G.V2 = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients2[1];"
+      }
+     ]
+    },
+    {
+     "line": 512,
+     "remove": [
+      "f300f71b9cad2593bec7be7aa6fcaf42202f3f9e5bd04726d43755229ca86dea",
+      "1a10ceab60af51a52609678eb72e8c016fc8f005c6dcb7d3456cb78bb06b720e",
+      "8d04bb5b39dfeb7ab1162b13bf4e0bbb0230755f3d4b1d7226c525f61ca24619"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tPointIndirectLighting.B.V0 = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients0[2];"
+      },
+      {
+       "text": "\t\t\tPointIndirectLighting.B.V1 = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients1[2];"
+      },
+      {
+       "text": "\t\t\tPointIndirectLighting.B.V2 = GetPrimitiveData(MaterialParameters.PrimitiveId).IndirectLightingSHCoefficients2[2];"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Shaders/Private/ForwardLightingCommon.ush",
+   "sha256": "c804f626f4de079f2f5257b236d52cf65a0fd635765646a141eb33844dc30ad4",
+   "edits": [
+    {
+     "line": 400,
+     "remove": [
+      "d5e6b675b7375a3299c44b24c2f3538917dd5f81783096b109dac4caf8962b94"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tTranslucentBasePass.Shared.ScreenSpaceReflection.HZBTextureLeftEye, TranslucentBasePass.Shared.ScreenSpaceReflection.HZBSampler,"
+      }
+     ]
+    },
+    {
+     "line": 403,
+     "remove": [
+      "6146bda40aea20f275104483b34c3cc5286dac43639e2e225d0e3a8f9fdf16fc"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tTranslucentBasePass.Shared.ScreenSpaceReflection.HZBUvFactorAndInvFactor,"
+      }
+     ]
+    },
+    {
+     "line": 413,
+     "remove": [
+      "5c268e38e280bd3ae6109fa32995ed6117abd3ab9347b89145833423bea06409"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tReprojectHit(TranslucentBasePass.Shared.ScreenSpaceReflection.PrevScreenPositionScaleBias, HitUVz, SampleUV, Vignette);"
+      }
+     ]
+    },
+    {
+     "line": 416,
+     "remove": [
+      "fc75eb437883cda8fa478765000dd14f3552c4d63d554be21fc1acca593a93d0",
+      "0b47a152533589833587bbd4cea6e39f253bf911f36e3a48706957591ac082c1"
+     ],
+     "add": [
+      {
+       "text": "\t\t\t\tTranslucentBasePass.Shared.ScreenSpaceReflection.PrevSceneColor, "
+      },
+      {
+       "text": "\t\t\t\tTranslucentBasePass.Shared.ScreenSpaceReflection.PrevSceneColorSampler,  "
+      }
+     ]
+    },
+    {
+     "line": 423,
+     "remove": [
+      "ca79e46cd48f213f22638036d7119a205c93c81ec79eaa95dd9a798f1894277c"
+     ],
+     "add": [
+      {
+       "text": "\t\t\t\tSSR.rgb *= TranslucentBasePass.Shared.ScreenSpaceReflection.PrevSceneColorPreExposureInv;"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Shaders/Private/MobileBasePassPixelShader.usf",
+   "sha256": "be06466a6adeeb7550488fb2038d405aeb199d83a299d44bd784236094d28271",
+   "edits": [
+    {
+     "line": 518,
+     "remove": [
+      "e235dd3c92100a6e230caee8b854b43c99bc6441e6f6e8b8c6841d49df45e225",
+      "0fa220e69f3c48c60d782ba2be8e85b6c96c2c472b3109bf88f0e100662f25af",
+      "d798737ebfd2ba6afe602a6c686aedd4f2fb3db482ee3212343025f603a31de4"
+     ],
+     "add": [
+      {
+       "text": "\t\tPointIndirectLighting.R.V0 = Primitive.IndirectLightingSHCoefficients0[0];"
+      },
+      {
+       "text": "\t\tPointIndirectLighting.R.V1 = Primitive.IndirectLightingSHCoefficients1[0];"
+      },
+      {
+       "text": "\t\tPointIndirectLighting.R.V2 = Primitive.IndirectLightingSHCoefficients2[0];"
+      }
+     ]
+    },
+    {
+     "line": 522,
+     "remove": [
+      "dbb3a57c658fb76be3651680cff971b7410023c5c40205ecc89097666eecad2f",
+      "c5fa21529bc896f8e90d7c3af7d0cd31216526ae82357479036bda9e85627cce",
+      "fef911bbc9c26e0e89743de605a4b3c6eba2c1ee837f39e100a16b80f0030d8d"
+     ],
+     "add": [
+      {
+       "text": "\t\tPointIndirectLighting.G.V0 = Primitive.IndirectLightingSHCoefficients0[1];"
+      },
+      {
+       "text": "\t\tPointIndirectLighting.G.V1 = Primitive.IndirectLightingSHCoefficients1[1];"
+      },
+      {
+       "text": "\t\tPointIndirectLighting.G.V2 = Primitive.IndirectLightingSHCoefficients2[1];"
+      }
+     ]
+    },
+    {
+     "line": 526,
+     "remove": [
+      "b677d26f6e8f0d1c8d9c3fd72520fbe329ab8d27aa8e004af1218b824b701d1a",
+      "19ba9a682bc879ae10c70969cbd1c55c6c3bedb47c0c8229b861a950c0d486f2",
+      "f177cc9b10845e5008743202629a0492ab4de582a6cc541e013e89226e62430e"
+     ],
+     "add": [
+      {
+       "text": "\t\tPointIndirectLighting.B.V0 = Primitive.IndirectLightingSHCoefficients0[2];"
+      },
+      {
+       "text": "\t\tPointIndirectLighting.B.V1 = Primitive.IndirectLightingSHCoefficients1[2];"
+      },
+      {
+       "text": "\t\tPointIndirectLighting.B.V2 = Primitive.IndirectLightingSHCoefficients2[2];"
+      }
+     ]
+    },
+    {
+     "line": 541,
+     "remove": [
+      "090bde6b60e804b0616cb111991661439442bd1dfb5f9a3de28dd3614b0d9a43"
+     ],
+     "add": [
+      {
+       "text": "\t\thalf3 PointIndirectLighting = Primitive.IndirectLightingSHSingleCoefficient.rgb;"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Shaders/Private/SceneData.ush",
+   "sha256": "92603ee015c9335bb930d64c4896c0095617b59b4adf98aa2aa2de69fd866c0f",
+   "edits": [
+    {
+     "line": 11,
+     "remove": [
+      "57970270393e249ce3ec22af7c7deca6a95a8d9200b71da6fbd4a7a4459da580"
+     ],
+     "add": [
+      {
+       "text": "#define NUM_CUSTOM_PRIMITIVE_DATA 5 // ITR 2.7.2 layout (was 9) // Num float4s used for custom data. Must match FCustomPrimitiveData::NumCustomPrimitiveDataFloat4s in SceneTypes.h"
+      }
+     ]
+    },
+    {
+     "line": 40,
+     "remove": [],
+     "add": [
+      {
+       "text": "\tfloat4 IndirectLightingSHCoefficients0[3];"
+      },
+      {
+       "text": "\tfloat4 IndirectLightingSHCoefficients1[3];"
+      },
+      {
+       "text": "\tfloat4 IndirectLightingSHCoefficients2;"
+      },
+      {
+       "text": "\tfloat4 IndirectLightingSHSingleCoefficient;"
+      }
+     ]
+    },
+    {
+     "line": 44,
+     "remove": [
+      "1cec268d224809228cbc1a089237af029a3d9d43bf9b2b6cbd5e8fd898132330"
+     ],
+     "add": [
+      {
+       "text": "#define PRIMITIVE_SCENE_DATA_STRIDE 33 // ITR 2.7.2 layout (was 36)"
+      }
+     ]
+    },
+    {
+     "line": 78,
+     "remove": [],
+     "add": [
+      {
+       "text": "// ITR 2.7.2 layout: E0 = (Row1.xyz, Row0.x), E1 = (Row2.xyz, Row0.y), E2 = (Row3.xyz, Row0.z)"
+      },
+      {
+       "text": "float4x4 UnpackPrimitiveMatrix3x4(FPrimitiveIndex PrimitiveIndex, uint Element)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        68
+       ]
+      },
+      {
+       "text": "\tfloat4 E0 = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, Element + 0);"
+      },
+      {
+       "text": "\tfloat4 E1 = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, Element + 1);"
+      },
+      {
+       "text": "\tfloat4 E2 = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, Element + 2);"
+      },
+      {
+       "text": "\treturn float4x4(float4(E0.w, E1.w, E2.w, 0), float4(E0.xyz, 0), float4(E1.xyz, 0), float4(E2.xyz, 1));"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        75
+       ]
+      },
+      {
+       "text": ""
+      }
+     ]
+    },
+    {
+     "line": 87,
+     "remove": [
+      "7064f6dccd143a516b3ab43a910c0a4d0f6d7584343761325b4478f14b56d546",
+      "2b5384068bea8f3440a76f9bc93a61820076e6029c49470733d12d92231f0514",
+      "5e5bf13a569c1808fdeafe35914bbbe27a2a5adb3a11056eba15dabe4b6392a3",
+      "53ba6000b13d4892fa44f03fcbe3c3fcb8332938bb90d8ecb59d9f8853689b9b",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "5647aa1626a0b47a62ea703cc733d14b6283ef2c107ed6b6972b265e6b0f8419",
+      "5e4ccf76dcfa722f58d42a05a7e0735593ea73288a027da8ef24624ec994a098"
+     ],
+     "add": [
+      {
+       "text": "\t// ITR 2.7.2 layout: affine matrices packed as 3 float4s (see FPrimitiveSceneShaderData::Setup)"
+      },
+      {
+       "text": "\tPrimitiveData.LocalToWorld = UnpackPrimitiveMatrix3x4(PrimitiveIndex, 0);"
+      },
+      {
+       "text": "\tPrimitiveData.InvNonUniformScaleAndDeterminantSign = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 3);"
+      },
+      {
+       "text": "\tPrimitiveData.ObjectWorldPositionAndRadius = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 4);"
+      },
+      {
+       "text": "\tPrimitiveData.WorldToLocal = UnpackPrimitiveMatrix3x4(PrimitiveIndex, 5);"
+      },
+      {
+       "text": "\tPrimitiveData.PreviousLocalToWorld = UnpackPrimitiveMatrix3x4(PrimitiveIndex, 8);"
+      },
+      {
+       "text": "\tPrimitiveData.PreviousWorldToLocal = UnpackPrimitiveMatrix3x4(PrimitiveIndex, 11);"
+      }
+     ]
+    },
+    {
+     "line": 95,
+     "remove": [
+      "1f8dec322a8e92121ef8054e2ffdc211ac2bdbf7dcf8866315bf49b12f7f8932",
+      "86af5f613c582c1859e7cb50e5f422037a551a9ade4805865adc58b9eb119182",
+      "43d87369cc63f7d6e98ab7edc7b5995739c47333d02ab8c3528ae8d717a42240",
+      "6f1839c23ccc71348f4baa05e2b17130584f64be9a3662610a5434370a1a5fc5"
+     ],
+     "add": [
+      {
+       "text": "\tPrimitiveData.ActorWorldPosition = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 14).xyz;"
+      },
+      {
+       "text": "\tPrimitiveData.UseSingleSampleShadowFromStationaryLights = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 14).w;"
+      }
+     ]
+    },
+    {
+     "line": 100,
+     "remove": [
+      "416b0c39c70966fb6c6a580e7253af8333bae8cab536ec86b73b8a408a05b843",
+      "fd2b576608954c329b914a780be2b0accdcbdb7c5f4e268e8f4fac6f56248537",
+      "35ead7187ffae6bbc971712b99f7221df7d9d78c18990cba9b564452d912e0f9",
+      "2478c1cf02afcc204adf945b2601b8b51326dbcb4d6c1927758937d1b4c15732"
+     ],
+     "add": [
+      {
+       "text": "\tPrimitiveData.ObjectBounds = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 15).xyz;"
+      },
+      {
+       "text": "\tPrimitiveData.LpvBiasMultiplier = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 15).w;"
+      }
+     ]
+    },
+    {
+     "line": 105,
+     "remove": [
+      "72deacbc02605022832eb17679b9e5eb63ab25fac61ab6256beac2282d7e9188",
+      "7f9421d18d216314e714ddfd513cae592ebb25921df57c2f69bbdd90adc0719d",
+      "7a49489110daec143fa628f8290e2aa810fd6d56131806a68f7c92ba9e8b0da1",
+      "10fc3ce091d42899aef65c450053e12c6497aa3eebc40a1240b0956712bfe3ca"
+     ],
+     "add": [
+      {
+       "text": "\tPrimitiveData.DecalReceiverMask = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 16).x;"
+      },
+      {
+       "text": "\tPrimitiveData.PerObjectGBufferData = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 16).y;"
+      },
+      {
+       "text": "\tPrimitiveData.UseVolumetricLightmapShadowFromStationaryLights = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 16).z;"
+      },
+      {
+       "text": "\tPrimitiveData.DrawsVelocity = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 16).w;"
+      }
+     ]
+    },
+    {
+     "line": 110,
+     "remove": [
+      "427000bd32c79b60b178d08533edad1d5eb8d98a299c497a2a33424935021242",
+      "2145a73ed69e0a1e341a38e31ee827dea14b821505c8b6850b98c1d5c3a2bb6f"
+     ],
+     "add": [
+      {
+       "text": "\tPrimitiveData.ObjectOrientation = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 17);"
+      },
+      {
+       "text": "\tPrimitiveData.NonUniformScale = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 18);"
+      }
+     ]
+    },
+    {
+     "line": 113,
+     "remove": [
+      "731af1b1ddfbe847d00c5c84e2e040b5c06f39e642fc1e6a7f009824d0f69001",
+      "257f7a4aabd8a7d8107367fb0a03a5eb2f16d3448760b9404ce75bc6a3eb23bf"
+     ],
+     "add": [
+      {
+       "text": "\tPrimitiveData.LocalObjectBoundsMin = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 19).xyz;"
+      },
+      {
+       "text": "\tPrimitiveData.LightingChannelMask = asuint(LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 19).w);"
+      }
+     ]
+    },
+    {
+     "line": 116,
+     "remove": [
+      "9e8e9ca7976b46f52ec34648a07e346db8792dd321b44536d79d66991b9bc22a",
+      "fc23c69715cbf9abe7816f3dd36fbf1d657326534cf5b00a678b0ef27156b23e",
+      "78dce3e2ebdf147c26c8cd8901a315d40cc328494949ee6af432c4cbfab788fb",
+      "c27d6e38eb9ef332544bafca631b9cf5033feae0339305f24c6ebc303321ad30"
+     ],
+     "add": [
+      {
+       "text": "\tPrimitiveData.LocalObjectBoundsMax = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 20).xyz;"
+      },
+      {
+       "text": "\tPrimitiveData.LightmapDataIndex = asuint(LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 20).w);"
+      }
+     ]
+    },
+    {
+     "line": 121,
+     "remove": [
+      "ab0af634f033f41e293ef3726a4f511d87c87f27dc3c66e37d97350d12fe30d9",
+      "a0dab35cac62fde2904642b19b7ddf9f2add81136f5b4caf4c2e3534a4924a4d"
+     ],
+     "add": [
+      {
+       "text": "\tPrimitiveData.PreSkinnedLocalBoundsMin = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 21).xyz;"
+      },
+      {
+       "text": "\tPrimitiveData.SingleCaptureIndex = asuint(LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 21).w);"
+      }
+     ]
+    },
+    {
+     "line": 124,
+     "remove": [
+      "d154d256ca02542f7905fb14ff4246e8c2b6757a0d2be1b85ef1d039d280ae02",
+      "9684e33d30bc3235cd78da3341c652b58aab0620787203214bb736cf5584764e"
+     ],
+     "add": [
+      {
+       "text": "\tPrimitiveData.PreSkinnedLocalBoundsMax = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 22).xyz;"
+      },
+      {
+       "text": "\tPrimitiveData.OutputVelocity = asuint(LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 22).w);"
+      }
+     ]
+    },
+    {
+     "line": 127,
+     "remove": [
+      "5c6846eea01b6f4c69c2ee40a52c72d0a342bb56d8bfd1e6986f192fef0e07fa",
+      "07d71491049e68fa120f0fea55c987129fba57b66bc39f40a034efbbbddf59ff",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "6144865893acabd02e05f52c763be9c62e7db6551880e0851e2f838053e18d08",
+      "c29c679a26014e3877f2ea1cd416650bd946f3517eb938535dc3afd9d85458ff",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "1ac375607a9c0c65e9db3bc0b0fd1555c6c7bde9c240d387b4d22d145bf19538",
+      "237bdef67ef66547d3d598ccd21324ace29a8f2c316b2f8f4f869a1ea8a8010f"
+     ],
+     "add": [
+      {
+       "text": "\t// ITR 2.7.2 layout: point indirect lighting SH, 16-bit quantised (see FPrimitiveSceneShaderData::Setup)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        350
+       ]
+      },
+      {
+       "text": "\t\tfloat4 SH2 = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 26);"
+      },
+      {
+       "text": "\t\tfloat Scale = SH2.w * (1.0f / 32768.0f);"
+      },
+      {
+       "text": "\t\tUNROLL"
+      },
+      {
+       "text": "\t\tfor (int c = 0; c < 3; c++)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        210
+       ]
+      },
+      {
+       "text": "\t\t\tuint4 Packed = asuint(LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 23 + c));"
+      },
+      {
+       "text": "\t\t\tPrimitiveData.IndirectLightingSHCoefficients0[c] = float4(Packed & 0xFFFF) * Scale - SH2.w;"
+      },
+      {
+       "text": "\t\t\tPrimitiveData.IndirectLightingSHCoefficients1[c] = float4(Packed >> 16) * Scale - SH2.w;"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        263
+       ]
+      },
+      {
+       "text": "\t\tPrimitiveData.IndirectLightingSHCoefficients2 = float4(SH2.xyz, 0);"
+      },
+      {
+       "text": "\t\tPrimitiveData.IndirectLightingSHSingleCoefficient = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 27);"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        353
+       ]
+      }
+     ]
+    },
+    {
+     "line": 139,
+     "remove": [
+      "5e527823c6953c8acf7054a0d057189c26a30914b6af6881dd9ac33d51a34cc9"
+     ],
+     "add": [
+      {
+       "text": "\t\tPrimitiveData.CustomPrimitiveData[i] = LoadPrimitivePrimitiveSceneDataElement(PrimitiveIndex, 28 + i);"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Editor/MaterialEditor/Private/MaterialEditingLibrary.cpp",
+   "sha256": "ca26cc0727efd49dbc658267581d6748bc4a89c9a85d682f5fdffecfbe2d6eab",
+   "edits": [
+    {
+     "line": 1030,
+     "remove": [],
+     "add": [
+      {
+       "text": "bool UMaterialEditingLibrary::SetMaterialInstanceStaticSwitchParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName, bool Value, int32 Association, int32 Index)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        68
+       ]
+      },
+      {
+       "text": "\tif (!Instance)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        350
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/SceneManagement.cpp",
+        1140
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        353
+       ]
+      },
+      {
+       "text": "\tFStaticParameterSet Params;"
+      },
+      {
+       "text": "\tInstance->GetStaticParameterValues(Params);"
+      },
+      {
+       "text": "\tconst FMaterialParameterInfo Info(ParameterName, static_cast<EMaterialParameterAssociation>(Association), Index);"
+      },
+      {
+       "text": "\tbool bFound = false;"
+      },
+      {
+       "text": "\tfor (FStaticSwitchParameter& Param : Params.StaticSwitchParameters)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        350
+       ]
+      },
+      {
+       "text": "\t\tif (Param.ParameterInfo == Info)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        210
+       ]
+      },
+      {
+       "text": "\t\t\tParam.Value = Value;"
+      },
+      {
+       "text": "\t\t\tParam.bOverride = true;"
+      },
+      {
+       "text": "\t\t\tbFound = true;"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        263
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        353
+       ]
+      },
+      {
+       "text": "\tif (bFound)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        350
+       ]
+      },
+      {
+       "text": "\t\tInstance->UpdateStaticPermutation(Params);"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        353
+       ]
+      },
+      {
+       "text": "\treturn bFound;"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        75
+       ]
+      },
+      {
+       "text": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Editor/MaterialEditor/Public/MaterialEditingLibrary.h",
+   "sha256": "80b1e87e35fbaa0433ad6d9f13d88b11128c70932168af8a16df935f4445bd0d",
+   "edits": [
+    {
+     "line": 271,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t/** ITR mod tooling: set a static switch parameter on a Material Instance (stock 4.27 can only read them)."
+      },
+      {
+       "text": "\t *  Association: 0 global, 1 layer, 2 blend; Index -1 for global parameters. The parameter must exist in the"
+      },
+      {
+       "text": "\t *  parent. Updates the static permutation. Returns false if the parameter wasn't found. */"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Public/MaterialEditingLibrary.h",
+        94
+       ]
+      },
+      {
+       "text": "\tstatic bool SetMaterialInstanceStaticSwitchParameterValue(UMaterialInstanceConstant* Instance, FName ParameterName, bool Value, int32 Association = 0, int32 Index = -1);"
+      },
+      {
+       "text": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Private/PrimitiveUniformShaderParameters.cpp",
+   "sha256": "f69dd3ca99f25fdb688d8c2443d5628d39d646b23ae213c24f23bc79beaf5f3a",
+   "edits": [
+    {
+     "line": 102,
+     "remove": [
+      "0fe841f8fe52c4af8a1e75f8e424f1debdfe1b63fe970aba8615a16d96773ec0"
+     ],
+     "add": [
+      {
+       "text": "\t// ITR 2.7.2 layout: the GPUScene layout (33 float4s) no longer mirrors FPrimitiveUniformShaderParameters (40)"
+      }
+     ]
+    },
+    {
+     "line": 105,
+     "remove": [
+      "f3210a64474ff0957c5b9db48a34e2c069058c0f23759d9383a84c6bb123a573",
+      "cef83c577fcf3f9597cd987ee309f77f610e8cc36d6055b30f647df4aa6a7ea8",
+      "50ccf4b14bb84923595b35348427ce9fbae996379f943fab3a1916ab9a7f108c",
+      "935077241ac9b943fd598f327ca80078fc0dbc88a8a00128b678950d150821d1",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fd9fd7650c01888395bf10f2342aee72ad561e2166aa28ed60c2943c59607ced",
+      "8a156cd86de86fe1dac5c204101fbf964c7bc5665f286ca3958ba8ab8bf93e34",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "8e5e37521224ae81067fa7abf6bb5f89ae6319c69d34d6830fa66f2b13354c86",
+      "8435785e07098043a2d999e5ef7af2c64e26846b1f0f757c2f0a0f10ea07392f",
+      "a546519d39466818f1ee47340a4aaedac6d650c20a183bc6951a8723c74c1752",
+      "0fb5d7e2a0d880c6611f5ceb692ae4404ef12420b98b6e7d57278002b3fdb8e0",
+      "cf5b654c40262b9462bc87f1223f7265570f81873d5bb8f6ccb96482b0a39663",
+      "813906456ff392b0c7d3f34bf8e6bda4a706514be7a95831b1ff7c54af8159ac",
+      "f0edfef8cf4919d9ef3176e028d74581f159a729544cd7a1fd9a969db80b7247",
+      "74692e22bd150a146f3ff490697298120330931027ee2f0f4f752bf5035ee344",
+      "602bd1f391cf2e6faf1e5b33b0183a73488df6ead5ee158ea3692464622a902b",
+      "3a1e082ca87467088f75c5590444148e8bd4676bd2f9d58f78bb3c4683c22e52",
+      "221aedb07ff1328e5160a83e6b239e93959036411a230517994e7354506b02b2",
+      "105f12837533a6926f6879b8f6a3e24e2662db020b242658c7e4bad69246da18",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "4cbc47a2d8117f4ea31d1c7aec185c6318f196b5ed8190f345b64a4df30e507e",
+      "a562127e7c111d937d6310c4faf58293007638c8100a6d075abc9c8918a13144",
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fbe8bbeb9c63ea4e85f0e281189bb450011ddb3bafa86ce4a97c8b948df43b6b"
+     ],
+     "add": [
+      {
+       "text": "\t// ITR 2.7.2 layout: affine matrices packed as 3 float4s: (Row1.xyz, Row0.x), (Row2.xyz, Row0.y), (Row3.xyz, Row0.z)"
+      },
+      {
+       "text": "\tauto Pack3x4 = [this](int32 Index, const FMatrix& M)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        350
+       ]
+      },
+      {
+       "text": "\t\tData[Index + 0] = FVector4(M.M[1][0], M.M[1][1], M.M[1][2], M.M[0][0]);"
+      },
+      {
+       "text": "\t\tData[Index + 1] = FVector4(M.M[2][0], M.M[2][1], M.M[2][2], M.M[0][1]);"
+      },
+      {
+       "text": "\t\tData[Index + 2] = FVector4(M.M[3][0], M.M[3][1], M.M[3][2], M.M[0][2]);"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditingLibrary.cpp",
+        154
+       ]
+      },
+      {
+       "text": "\tPack3x4(0, PrimitiveUniformShaderParameters.LocalToWorld);"
+      },
+      {
+       "text": "\tData[3] = PrimitiveUniformShaderParameters.InvNonUniformScaleAndDeterminantSign;"
+      },
+      {
+       "text": "\tData[4] = PrimitiveUniformShaderParameters.ObjectWorldPositionAndRadius;"
+      },
+      {
+       "text": "\tPack3x4(5, PrimitiveUniformShaderParameters.WorldToLocal);"
+      },
+      {
+       "text": "\tPack3x4(8, PrimitiveUniformShaderParameters.PreviousLocalToWorld);"
+      },
+      {
+       "text": "\tPack3x4(11, PrimitiveUniformShaderParameters.PreviousWorldToLocal);"
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "\tData[14] = FVector4(PrimitiveUniformShaderParameters.ActorWorldPosition, PrimitiveUniformShaderParameters.UseSingleSampleShadowFromStationaryLights);"
+      },
+      {
+       "text": "\tData[15] = FVector4(PrimitiveUniformShaderParameters.ObjectBounds, PrimitiveUniformShaderParameters.LpvBiasMultiplier);"
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "\tData[16] = FVector4("
+      }
+     ]
+    },
+    {
+     "line": 134,
+     "remove": [
+      "b537371ff13e5347d8306e7c0be46dd6dc242b2267b236175bba48390fc3cc3d",
+      "72ace9a8a3f566f34250dc0453c627f209cd28c359654b90d474f4ff25ea0074"
+     ],
+     "add": [
+      {
+       "text": "\tData[17] = PrimitiveUniformShaderParameters.ObjectOrientation;"
+      },
+      {
+       "text": "\tData[18] = PrimitiveUniformShaderParameters.NonUniformScale;"
+      }
+     ]
+    },
+    {
+     "line": 138,
+     "remove": [
+      "6e102927821733e65e379c61ae40ca150baa734a6f1833d71318163db6738291",
+      "d7a2faecb5a9e36a3446d882f5d7326356330c81595b1226151a5c4fea0b8912"
+     ],
+     "add": [
+      {
+       "text": "\tData[19] = FVector4(PrimitiveUniformShaderParameters.LocalObjectBoundsMin, 0.0f);"
+      },
+      {
+       "text": "\tData[19].W = *(const float*)&PrimitiveUniformShaderParameters.LightingChannelMask;"
+      }
+     ]
+    },
+    {
+     "line": 141,
+     "remove": [
+      "2e1e2ae7dba2f508ab19d181a2a667becbe52e0784a22e55a448de4d18be0e32",
+      "603fd1162917c0507af1c04823d7008c387a79098b82a9ec22f58e6d229df6c5"
+     ],
+     "add": [
+      {
+       "text": "\tData[20] = FVector4(PrimitiveUniformShaderParameters.LocalObjectBoundsMax, 0.0f);"
+      },
+      {
+       "text": "\tData[20].W = *(const float*)&PrimitiveUniformShaderParameters.LightmapDataIndex;"
+      }
+     ]
+    },
+    {
+     "line": 144,
+     "remove": [
+      "729c424f8e7d6852a4976f4d05b224bad4ec7c4e6e3840368d902c37d0892e0d",
+      "3cfbb09f74d27865793e1b7f3f28a879d6f637d28658af1485ab00574ef3c132"
+     ],
+     "add": [
+      {
+       "text": "\tData[21] = FVector4(PrimitiveUniformShaderParameters.PreSkinnedLocalBoundsMin, 0.0f);"
+      },
+      {
+       "text": "\tData[21].W = *(const float*)&PrimitiveUniformShaderParameters.SingleCaptureIndex;"
+      }
+     ]
+    },
+    {
+     "line": 147,
+     "remove": [
+      "16d7bc725aaea803be5a7833fdf07eea8aed203bf66a8282821620745f76130b",
+      "cadf8c15938f6559c3d524e27bbb2cb38b1e0993eb11025ce3f2a990d2b5dfc2"
+     ],
+     "add": [
+      {
+       "text": "\tData[22] = FVector4(PrimitiveUniformShaderParameters.PreSkinnedLocalBoundsMax, 0.0f);"
+      },
+      {
+       "text": "\tData[22].W = *(const float*)&PrimitiveUniformShaderParameters.OutputVelocity;"
+      }
+     ]
+    },
+    {
+     "line": 151,
+     "remove": [
+      "6105d1ca2512743fbbc0962971b79f14860877295fcd95ee1417cc12ae595add"
+     ],
+     "add": [
+      {
+       "text": "\t// Point indirect lighting SH, quantised to 16 bits per coefficient: Data[23 + RGB] = V0 (low) | V1 (high),"
+      },
+      {
+       "text": "\t// Data[26] = (V2.rgb, range). Decoded in SceneData.ush."
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        350
+       ]
+      },
+      {
+       "text": "\t\tconst FPrimitiveUniformShaderParameters& P = PrimitiveUniformShaderParameters;"
+      },
+      {
+       "text": "\t\tfloat Range = 0.0f;"
+      },
+      {
+       "text": "\t\tfor (int32 c = 0; c < 3; c++)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        210
+       ]
+      },
+      {
+       "text": "\t\t\tfor (int32 k = 0; k < 4; k++)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        228
+       ]
+      },
+      {
+       "text": "\t\t\t\tRange = FMath::Max(Range, FMath::Abs(P.IndirectLightingSHCoefficients0[c][k]));"
+      },
+      {
+       "text": "\t\t\t\tRange = FMath::Max(Range, FMath::Abs(P.IndirectLightingSHCoefficients1[c][k]));"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        230
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        263
+       ]
+      },
+      {
+       "text": "\t\tauto Quantize = [Range](float V) -> uint32"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        210
+       ]
+      },
+      {
+       "text": "\t\t\treturn Range > 0.0f ? (uint32)FMath::Clamp(FMath::RoundToInt((V + Range) * 32768.0f / Range), 0, 65535) : 32768u;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Renderer/Private/BasePassRendering.cpp",
+        221
+       ]
+      },
+      {
+       "text": "\t\tfor (int32 c = 0; c < 3; c++)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        210
+       ]
+      },
+      {
+       "text": "\t\t\tuint32 Packed[4];"
+      },
+      {
+       "text": "\t\t\tfor (int32 k = 0; k < 4; k++)"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        228
+       ]
+      },
+      {
+       "text": "\t\t\t\tPacked[k] = Quantize(P.IndirectLightingSHCoefficients0[c][k]) | (Quantize(P.IndirectLightingSHCoefficients1[c][k]) << 16);"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        230
+       ]
+      },
+      {
+       "text": "\t\t\tFMemory::Memcpy(&Data[23 + c], Packed, sizeof(Packed));"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        263
+       ]
+      },
+      {
+       "text": "\t\tData[26] = FVector4(P.IndirectLightingSHCoefficients2.X, P.IndirectLightingSHCoefficients2.Y, P.IndirectLightingSHCoefficients2.Z, Range);"
+      },
+      {
+       "text": "\t\tData[27] = P.IndirectLightingSHSingleCoefficient;"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        353
+       ]
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "\tconst int32 CustomPrimitiveDataStartIndex = 28;"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Private/SceneManagement.cpp",
+   "sha256": "b5a02c78dfdc322814ee5747ffaaeac80058f975d527966402e7a7101f3b5398",
+   "edits": [
+    {
+     "line": 756,
+     "remove": [],
+     "add": [
+      {
+       "text": "\tContactShadowsIndirectionGrid = GIdentityPrimitiveBuffer.PrimitiveSceneDataBufferSRV; // ITR 2.7.2 layout"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Private/SceneView.cpp",
+   "sha256": "4ecc072fd07ea2d134f7984b599c9452ef980a89af25daac45e0113c176ad0cf",
+   "edits": [
+    {
+     "line": 2433,
+     "remove": [
+      "f264a158a3f903fef4bdb1c35ec5a74955784f4c7ef3fa4c6bc13c34e88a34a7"
+     ],
+     "add": []
+    },
+    {
+     "line": 2435,
+     "remove": [
+      "614a6bc8111dea5f21fe4ccf5626ef5ff5a31e175952116b34adc3dd15aae6c1"
+     ],
+     "add": []
+    },
+    {
+     "line": 2443,
+     "remove": [
+      "5455a037a733a696b9583c4212eb9eea8ff9761b0b8de3e251bd416aa9412a2a"
+     ],
+     "add": []
+    },
+    {
+     "line": 2445,
+     "remove": [
+      "d00a894c1ad1ae829e0a519df7c32da25ee1a1766ac96323a7698998d8ee8157"
+     ],
+     "add": []
+    },
+    {
+     "line": 2453,
+     "remove": [
+      "51a99096fffeff5b697d9f9b86bc64f3162195cad7181f6b1c9f44cb1e91857b"
+     ],
+     "add": []
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Public/PrimitiveUniformShaderParameters.h",
+   "sha256": "e42081eb872e26a4484dd4694c75ee24596435716ef7d19f4a167a96924605ed",
+   "edits": [
+    {
+     "line": 45,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t// ITR 2.7.2 layout: point indirect lighting SH moved here from FIndirectLightingCacheUniformParameters"
+      },
+      {
+       "text": "\tSHADER_PARAMETER_ARRAY_EX(FVector4, IndirectLightingSHCoefficients0, [3], EShaderPrecisionModifier::Half)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER_ARRAY_EX(FVector4, IndirectLightingSHCoefficients1, [3], EShaderPrecisionModifier::Half)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER_EX(FVector4, IndirectLightingSHCoefficients2, EShaderPrecisionModifier::Half)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER_EX(FVector4, IndirectLightingSHSingleCoefficient, EShaderPrecisionModifier::Half)"
+      }
+     ]
+    },
+    {
+     "line": 113,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t// ITR 2.7.2 layout: SH not plumbed through in this engine (zero = no point indirect lighting)"
+      },
+      {
+       "text": "\tFMemory::Memzero(Result.IndirectLightingSHCoefficients0);"
+      },
+      {
+       "text": "\tFMemory::Memzero(Result.IndirectLightingSHCoefficients1);"
+      },
+      {
+       "text": "\tResult.IndirectLightingSHCoefficients2 = FVector4(0, 0, 0, 0);"
+      },
+      {
+       "text": "\tResult.IndirectLightingSHSingleCoefficient = FVector4(0, 0, 0, 0);"
+      }
+     ]
+    },
+    {
+     "line": 214,
+     "remove": [
+      "2a708364b8ac97eb0a3446bb49666c02fe1d01789332b681058196abe3fe22cd"
+     ],
+     "add": [
+      {
+       "text": "\tenum { PrimitiveDataStrideInFloat4s = 33 }; // ITR 2.7.2 layout (was 36)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Public/SceneTypes.h",
+   "sha256": "66543a7c2041d0a4622651a35d0fb677eb08da2b53839561429e91a1fc8f3f3f",
+   "edits": [
+    {
+     "line": 28,
+     "remove": [
+      "5a34e70c903a39da13c417fae86e4007a611100fea94972e35281aab8a091625"
+     ],
+     "add": [
+      {
+       "text": "\tstatic constexpr int32 NumCustomPrimitiveDataFloat4s = 5; // ITR 2.7.2 layout (was 9); // Must match NUM_CUSTOM_PRIMITIVE_DATA in SceneData.ush"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Public/SceneView.h",
+   "sha256": "7af024d40d389250ecbbb4122bc255960c0c28fa6130445429c7bc91e3f2db65",
+   "edits": [
+    {
+     "line": 609,
+     "remove": [
+      "33a08d8c7d4d9aedad48b657bc917b1fa7cbf59b97c0e47f3b87f2b1239e1e2b"
+     ],
+     "add": []
+    },
+    {
+     "line": 611,
+     "remove": [
+      "d7b6e28bc09a6825e09ba1c5c3ae86944c1835bec6aac983ffcbdc68d8d27150"
+     ],
+     "add": []
+    },
+    {
+     "line": 615,
+     "remove": [
+      "02a5cd2aa10537e8c74a126e06bffda9468977f01b2f4149557d67236292dba4"
+     ],
+     "add": []
+    },
+    {
+     "line": 617,
+     "remove": [
+      "ceb482a0f82717b39687566149732880376e0f40b7fb2669b7d3a3a52c1a8bdc"
+     ],
+     "add": []
+    },
+    {
+     "line": 622,
+     "remove": [
+      "a2cb580cd6ca868d4c00a3cd38ea43c6a7fb8abb1bafaa07b8abdece10e1122d"
+     ],
+     "add": []
+    },
+    {
+     "line": 775,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t/* ITR 2.7.2 layout (docs/shader-compat-plan.md): contact shadow spheres */ \\"
+      },
+      {
+       "text": "\tVIEW_UNIFORM_BUFFER_MEMBER_ARRAY(FVector4, ContactShadowsSpheres, 32) \\"
+      },
+      {
+       "text": "\tVIEW_UNIFORM_BUFFER_MEMBER(FVector4, ContactShadowsWorldToGrid) \\"
+      },
+      {
+       "text": "\tVIEW_UNIFORM_BUFFER_MEMBER(FVector4, ContactShadowsFadeByDistance) \\"
+      },
+      {
+       "text": "\tVIEW_UNIFORM_BUFFER_MEMBER_EX(FVector4, ContactShadowsCombinedConst, EShaderPrecisionModifier::Half) \\"
+      },
+      {
+       "text": "\tVIEW_UNIFORM_BUFFER_MEMBER(uint32, ContactShadowsMask) \\"
+      }
+     ]
+    },
+    {
+     "line": 873,
+     "remove": [],
+     "add": [
+      {
+       "text": "\tSHADER_PARAMETER_SRV(StructuredBuffer<uint>, ContactShadowsIndirectionGrid) // ITR 2.7.2 layout"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/RenderCore/Public/UnifiedBuffer.h",
+   "sha256": "f6fa23a63cc622ea04c484e34ba7641b9b2ef40d9daa1cad6ef51c2487dd55da",
+   "edits": [
+    {
+     "line": 25,
+     "remove": [
+      "2a708364b8ac97eb0a3446bb49666c02fe1d01789332b681058196abe3fe22cd"
+     ],
+     "add": [
+      {
+       "text": "\tenum { PrimitiveDataStrideInFloat4s = 33 }; // ITR 2.7.2 layout (was 36)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Renderer/Private/BasePassRendering.cpp",
+   "sha256": "d7bdffbfdb7cb1ec08c87858a19c5ec88a06a22abd1ca580c37a529dd8fc431f",
+   "edits": [
+    {
+     "line": 564,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t// ITR 2.7.2 layout: forward SSR parameters. Defaults here; the translucent pass fills the material SSR inputs."
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        350
+       ]
+      },
+      {
+       "text": "\t\tFScreenSpaceReflectionUniformParameters& SSR = SharedParameters.ScreenSpaceReflection;"
+      },
+      {
+       "text": "\t\tFRDGTextureRef BlackDummy = RegisterExternalOrPassthroughTexture(GraphBuilder, GSystemTextures.BlackDummy);"
+      },
+      {
+       "text": "\t\tSSR.HZBUvFactorAndInvFactor = FVector4(1, 1, 1, 1);"
+      },
+      {
+       "text": "\t\tSSR.PrevScreenPositionScaleBias = FVector4(0.5f, -0.5f, 0.5f, 0.5f);"
+      },
+      {
+       "text": "\t\tSSR.PrevSceneColorPreExposureInv = 1.0f / View.PreExposure;"
+      },
+      {
+       "text": "\t\tSSR.SSRQuality = 0;"
+      },
+      {
+       "text": "\t\tSSR.DecodeSceneColor = 0;"
+      },
+      {
+       "text": "\t\tSSR.VrMode = View.IsInstancedStereoPass() ? 1 : 0;"
+      },
+      {
+       "text": "\t\tSSR.RayCount = 0;"
+      },
+      {
+       "text": "\t\tSSR.RayCastFirstMipLevel = 0.0f;"
+      },
+      {
+       "text": "\t\tSSR.RoughnessToMipScale = 0.0f;"
+      },
+      {
+       "text": "\t\tSSR.RayLengthScale = 1.0f;"
+      },
+      {
+       "text": "\t\tSSR.DepthCompareToleranceScale = 1.0f;"
+      },
+      {
+       "text": "\t\tSSR.NoiseScale = 0.0f;"
+      },
+      {
+       "text": "\t\tSSR.StepScreenFactorScale = 1.0f;"
+      },
+      {
+       "text": "\t\tSSR.HZBTextureLeftEye = BlackDummy;"
+      },
+      {
+       "text": "\t\tSSR.HZBTextureRightEye = BlackDummy;"
+      },
+      {
+       "text": "\t\tSSR.HZBSampler = TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();"
+      },
+      {
+       "text": "\t\tSSR.PrevSceneColor = BlackDummy;"
+      },
+      {
+       "text": "\t\tSSR.PrevSceneColorSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();"
+      },
+      {
+       "ref": [
+        "Engine/Shaders/Private/BasePassPixelShader.usf",
+        353
+       ]
+      },
+      {
+       "text": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Renderer/Private/BasePassRendering.h",
+   "sha256": "e11d571ac1a815718e492cec8be7362a23d700762307825d8d603b78b315e343",
+   "edits": [
+    {
+     "line": 52,
+     "remove": [],
+     "add": [
+      {
+       "text": "// ITR 2.7.2 layout: forward screen space reflections (stereo HZB), nested in the shared base pass parameters"
+      },
+      {
+       "text": "BEGIN_SHADER_PARAMETER_STRUCT(FScreenSpaceReflectionUniformParameters, )"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Renderer/Private/BasePassRendering.h",
+        94
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Renderer/Private/BasePassRendering.h",
+        95
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Renderer/Private/BasePassRendering.h",
+        96
+       ]
+      },
+      {
+       "text": "\tSHADER_PARAMETER(int32, SSRQuality)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER(int32, DecodeSceneColor)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER(int32, VrMode)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER(int32, RayCount)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER(float, RayCastFirstMipLevel)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER(float, RoughnessToMipScale)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER(float, RayLengthScale)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER(float, DepthCompareToleranceScale)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER(float, NoiseScale)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER(float, StepScreenFactorScale)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER_RDG_TEXTURE(Texture2D, HZBTextureLeftEye)"
+      },
+      {
+       "text": "\tSHADER_PARAMETER_RDG_TEXTURE(Texture2D, HZBTextureRightEye)"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Renderer/Private/BasePassRendering.h",
+        98
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Renderer/Private/BasePassRendering.h",
+        99
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Renderer/Private/BasePassRendering.h",
+        100
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Renderer/Private/BasePassRendering.cpp",
+        997
+       ]
+      },
+      {
+       "text": ""
+      }
+     ]
+    },
+    {
+     "line": 59,
+     "remove": [],
+     "add": [
+      {
+       "text": "\tSHADER_PARAMETER_STRUCT(FScreenSpaceReflectionUniformParameters, ScreenSpaceReflection) // ITR 2.7.2 layout"
+      }
+     ]
+    },
+    {
+     "line": 93,
+     "remove": [
+      "446ffa7ad20509d8b2e3d2be1a5ab4f62333bdd4a6d332791d5d3718508c2895",
+      "f9ac3ac5130905ab6a87a8b6c243976dd2b83b3680fa5a49c1a5b6cf1c7fe36f",
+      "6eb3da37518019eceb87bde20e871fccb793f368e81bcb78f7b44c9795b4a4a9",
+      "47e840bf13d3066bcc913cbd8983db6676087d1b76b45fee3f6ca643c4a27834",
+      "89c31032b5b834ce8d7f50783bbf7663d2ed413c3a6ff1e57f0c95793ecca9d7",
+      "f5eac91adf25013b6049eb96c120a4534ce840e13fbc3bfe6e8b83f71c1a4c2a",
+      "10b75c8f7468012df287f0d1c0ae68a1bdb94c1e77f461abb2bc3fb480af41df",
+      "ba8dc6351efeaf58756414d12f5fba47bb9d16d63ddce4b5a9c287de1b112083"
+     ],
+     "add": [
+      {
+       "text": "\t// Material SSR: moved to Shared.ScreenSpaceReflection (ITR 2.7.2 layout)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Renderer/Private/LightMapRendering.cpp",
+   "sha256": "bb101f7aeed487fc13b53be05969d9e60a19baf019b7c2223de037a2bd1f1085",
+   "edits": [
+    {
+     "line": 316,
+     "remove": [
+      "bce85f53ccc9bfe64376cde5a506cf754336f3dd12791ad3ab4302a57187b2c5",
+      "8fbdc8c716c259a17bc8ea71784c0472f394816fa22241d516addd5b9851b0c6"
+     ],
+     "add": []
+    },
+    {
+     "line": 320,
+     "remove": [
+      "cb9abe31c20a0c1c00b602a40b9eb338912d24a02b33e3ac4e0a01f9684e8198",
+      "deb1eb9028c6a2a4f9d90f4de21876e1a3266d805673bbc1af282ec5d90cf499"
+     ],
+     "add": []
+    },
+    {
+     "line": 340,
+     "remove": [
+      "26fb99679c1a88c0000f032f22013fdfbaa3f572e81c8a37e76bf1c012cc2f39",
+      "a4631d7e3eb7a2cf729f873de4166141277ddcc9a4a6c82a1dc32ec84ebe6505"
+     ],
+     "add": []
+    },
+    {
+     "line": 343,
+     "remove": [
+      "ed1034db5149a4a181414467996c9a49aaf90de726e5f2b681f6655324e35368",
+      "9dc1277aed8978bd9bfdb20a8eefa446102c53f98eb6aa90209f7c7021c6b18d",
+      "8a34980f0c0af8e4c8537552a9e6580390f376bc26ab5ddcb68e594f29e017eb",
+      "3713bbfd76dcaac1a6d8316dc5b8e2bccaf4b47f2c767f953af2ed65363ec925",
+      "d1cea5dff087c5baef6e8be0eab4df5ff789cd5752e8222dd8a995c281c7442a",
+      "3a763367d01721792737a0bfdbda56cd4cf700fe32218edd448db376c28f70b4",
+      "a94caf824501295c8d2e0582cb0d96ec005b69e3b9f16a6db40340a82daecb30"
+     ],
+     "add": []
+    },
+    {
+     "line": 358,
+     "remove": [
+      "f10370815659629c3d37f7267c7f6297cdb5a70d685a015e5b05fe2b3ae9824c",
+      "9e65d46405aae57682b081ecbeb390e15697db95a5142ac2ad22f7972b445ea9"
+     ],
+     "add": []
+    },
+    {
+     "line": 361,
+     "remove": [
+      "332b9ad79f09a06fcf5549e37bb78bfcb81c1e4a6a3349ad6ff7ba7f68f4300b",
+      "dec2ad6216887652a0854c4b9178d51c48a21c6e5daaf40dbd269138d270ac65"
+     ],
+     "add": []
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Renderer/Private/LightMapRendering.h",
+   "sha256": "f089bd0f67b46055d05bf071b5352d295d68984fa86f83cca8390be36006eb90",
+   "edits": [
+    {
+     "line": 26,
+     "remove": [
+      "80405d6d1e2cd6728d191b8a075c15ae3a8c48ad38af6ca5c05b532b23ffcc54",
+      "fb33460ae2af6c119018e3c1c37d9ad67429b1b07802ea3ca99c8afbf103b542",
+      "8b2f605d174589a60616464351a0089ab1307350fa5e22a8cfb01c8347bbe9d4",
+      "a23c36387f65c328e22a7215c78853459018b8b4f873854a79d7de508ae46032"
+     ],
+     "add": []
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Renderer/Private/TranslucentRendering.cpp",
+   "sha256": "23755ba5865944d0ae80bdac99a18983313e50252e4d3941ef5f35d9faec7985",
+   "edits": [
+    {
+     "line": 681,
+     "remove": [
+      "b9cfcd46948cfb40bed4b886d46deac61f8dd011d53e94fe2fe02e6120422e6e",
+      "d5607bf91a760f1c32c61597847600a06eed7cf7a691d329f3bc6bf253a7e546"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tBasePassParameters.Shared.ScreenSpaceReflection.HZBTextureLeftEye = BasePassParameters.Shared.ScreenSpaceReflection.HZBTextureRightEye = GetRDG(View.HZB);"
+      },
+      {
+       "text": "\t\t\tBasePassParameters.Shared.ScreenSpaceReflection.HZBSampler = TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();"
+      }
+     ]
+    },
+    {
+     "line": 697,
+     "remove": [
+      "6bf72c718d71a23b54cabd940a512b7f17d6b5eecce40d88d624d453cf9282bf",
+      "f4111c7c0b45d17862b9342fca779fe21fbf49856a7f8999d91bab6541469f0c"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tBasePassParameters.Shared.ScreenSpaceReflection.PrevSceneColor = PrevSceneColorTexture;"
+      },
+      {
+       "text": "\t\t\tBasePassParameters.Shared.ScreenSpaceReflection.PrevSceneColorSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();"
+      }
+     ]
+    },
+    {
+     "line": 711,
+     "remove": [
+      "ee526ea3dc860ddfbcb415aeb9b3fc72663394aa95929d1f58e95a5662892387"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tBasePassParameters.Shared.ScreenSpaceReflection.HZBUvFactorAndInvFactor = HZBUvFactorAndInvFactorValue;"
+      }
+     ]
+    },
+    {
+     "line": 715,
+     "remove": [
+      "0cfdac8f0f394b063ce98d4c26f7d47316a32132d7e2c13ac065b6c4adcec068",
+      "d5607bf91a760f1c32c61597847600a06eed7cf7a691d329f3bc6bf253a7e546",
+      "b7d024fa2f88891a3e82246ab1a6a78dee3d4094756b105be3279d503bd885ff",
+      "f4111c7c0b45d17862b9342fca779fe21fbf49856a7f8999d91bab6541469f0c"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tBasePassParameters.Shared.ScreenSpaceReflection.HZBTextureLeftEye = BasePassParameters.Shared.ScreenSpaceReflection.HZBTextureRightEye = BlackDummyTexture;"
+      },
+      {
+       "text": "\t\t\tBasePassParameters.Shared.ScreenSpaceReflection.HZBSampler = TStaticSamplerState<SF_Point, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();"
+      },
+      {
+       "text": "\t\t\tBasePassParameters.Shared.ScreenSpaceReflection.PrevSceneColor = BlackDummyTexture;"
+      },
+      {
+       "text": "\t\t\tBasePassParameters.Shared.ScreenSpaceReflection.PrevSceneColorSampler = TStaticSamplerState<SF_Bilinear, AM_Clamp, AM_Clamp, AM_Clamp>::GetRHI();"
+      }
+     ]
+    },
+    {
+     "line": 767,
+     "remove": [
+      "56bd0cea28c9c8a612e11237a623acf0bc2d4099f21b269782bffd3434f9db74",
+      "e3b3d40bf033adc63cdf356d38795c404eee316278bc7de2aa931076ab2a68cf"
+     ],
+     "add": [
+      {
+       "text": "\t\tBasePassParameters.Shared.ScreenSpaceReflection.PrevScreenPositionScaleBias = ScreenPosToPixelValue;"
+      },
+      {
+       "text": "\t\tBasePassParameters.Shared.ScreenSpaceReflection.PrevSceneColorPreExposureInv = PrevSceneColorPreExposureInvValue;"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Renderer/Private/PostProcess/SceneRenderTargets.cpp",
+   "sha256": "22111fd04a882d582a1b6034bf32b6bbefb1a4ff956d9f7e3c1aba23d9377b0e",
+   "edits": [
+    {
+     "line": 2376,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t\tSceneTextureParameters.SceneDepthPackedSamplesTexture = DepthDefault; // ITR 2.7.2 layout"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Renderer/Public/SceneRenderTargetParameters.h",
+   "sha256": "9c114dd4f6c6659c5a04653968f7c80ac9b3a9cd377a57c40ec35d45dff31637",
+   "edits": [
+    {
+     "line": 14,
+     "remove": [],
+     "add": [
+      {
+       "text": "\tSHADER_PARAMETER_RDG_TEXTURE(Texture2D, SceneDepthPackedSamplesTexture) // ITR 2.7.2 layout"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
