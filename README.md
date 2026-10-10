@@ -3,12 +3,12 @@
 Shared material for modding **Into the Radius 1** (PC VR, game version 2.7.2): custom maps, and the tools and data
 behind them.
 
-## Try the example map (10 minutes, no editor)
-1. **UE4SS:** download "UE4SS for ITR1" from Nexus Mods
+## Example map test
+1. **UE4SS:** Example used was "UE4SS for ITR1" from Nexus Mods for no particular reason.
    (https://www.nexusmods.com/intotheradiusvr/mods/359; we used `UE4SS-ITR-359-v3-0-1-321-gc62ada0`). Then:
    - copy `dwmapi.dll` and the `ue4ss` folder into `<game>\IntoTheRadius\Binaries\Win64\`;
-   - don't copy `override.txt` (the game hangs at startup if you do);
-   - rename `ue4ss\Mods` to `ue4ss\LuaMods`.
+   - maybe don't copy `override.txt` (the game hung at startup for me);
+   - I had to rename `ue4ss\Mods` to `ue4ss\LuaMods` mentioned on the install instructions. Not sure why I had that issue since I assumed the version included was the experimental version and that the folder structure would line up but someone can correct me here.
 2. **The loader:** copy [`loader-ue4ss/ITRMapLoader`](loader-ue4ss/) into `ue4ss\LuaMods\`. In
    `ITRMapLoader\Scripts\config.lua`, set `AutoLoadInHub = "Example",`.
 3. **The map:** copy [`example-map/prebuilt/zzz_ITRMap_Example_P.pak`](example-map/prebuilt/) into
@@ -23,6 +23,8 @@ To undo it all: delete the pak, `dwmapi.dll` and the `ue4ss` folder. Details and
 
 ## Make your own
 **Start here: [`map-making/guide.md`](map-making/guide.md)**. It goes from nothing to walking around your own map.
+
+It's long and a pain in the neck because it involves building a specific unreal editor version to be able to make the materials and shaders work. If you're not using new materials then you can probably just use the normal version. Not sure, untested.
 
 | Path | What | State |
 |---|---|---|
@@ -42,7 +44,7 @@ Notes:
 
 ## Licence
 - Everything in this repository is licensed under the **GNU Affero General Public License v3.0** ([`LICENSE`](LICENSE)),
-  copyright (c) 2026 oldgrev, **except:**
+  **except:**
   - [`engine/`](engine/): **MIT** ([`engine/LICENSE`](engine/LICENSE)). The patch's lines are compiled into Unreal
     Engine, and the Unreal Engine EULA doesn't allow engine code to be combined with copyleft licences such as the
     AGPL. MIT keeps the patch usable by every engine licensee.
@@ -50,4 +52,4 @@ Notes:
     code compiled from Epic's engine shaders, so it's governed by the Unreal Engine EULA, not by this repository's
     licence.
   - [`data/ub/`](data/ub/): metadata read from the game's executable; no licence is claimed over it.
-- Maps you build with the example scripts are your own work; the AGPL covers the scripts, not what you make with them.
+- Maps you build with the example scripts are your own work; the AGPL covers the scripts, but I've no idea how it all accumulates for your own maps etc.
