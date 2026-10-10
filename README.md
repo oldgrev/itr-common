@@ -5,8 +5,8 @@ game, plus the stuff needed along the way.
 
 ## Example map test
 1. **UE4SS:** Example used was "UE4SS for ITR1" from Nexus Mods for no particular reason
-   (https://www.nexusmods.com/intotheradiusvr/mods/359; we used `UE4SS-ITR-359-v3-0-1-321-gc62ada0`).
-   use vortex, or manually as that page describes:
+   (https://www.nexusmods.com/intotheradiusvr/mods/359; I used `UE4SS-ITR-359-v3-0-1-321-gc62ada0`).
+   use vortex, or manually as that page describes. I'm not sure if it's the best one to use on nexus mods and if you are sure then you probably don't need to read this bit about how to set it up or add a lua mod. 
    - `dwmapi.dll` and `override.txt` go into `<game>\IntoTheRadius\Binaries\Win64\`;
    - the **contents** of the zip's `ue4ss\` folder go into `<game>\IntoTheRadius\Content\Paks\`, so that
      `UE4SS.dll` sits directly in `Paks`;
