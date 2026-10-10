@@ -1,57 +1,53 @@
 # Example map
 
-A small test map for Into the Radius 1 (2.7.2):
-- an 80 m floor with a 1 m checker, walls, cover, a hut, and a ramp up to a platform;
-- a sky dome and Movable lights;
-- a start marker, navmesh, and an exit pad (8 m to the left of the start) that takes you back to the Hub.
+A small test map for Into the Radius 1 (2.7.2). It's an 80 m floor with a checker pattern, some walls and cover, a
+hut, and a ramp up to a platform. It has a sky dome and Movable lights, a start marker, navmesh, and an exit pad about
+8 m to the left of where you start, which takes you back to the Hub.
 
-The floor's material, `M_ExampleGrid`, is compiled by **your** editor. It's the proof that the special editor
-works: built with it, the checker renders in the game; built with stock 4.27, the game would crash or draw it black.
-Set `OWN_MATERIAL = False` in `Scripts/build_example.py` to build with stock 4.27 instead (engine content only).
+The floor uses `M_ExampleGrid`, a material your editor compiles, so it doubles as a check that your special editor
+works. Built with the special editor, the checker shows up in game. Built with stock 4.27, the game would crash or
+draw it black. If you only have stock 4.27, set `OWN_MATERIAL = False` in `Scripts/build_example.py` and it'll stick
+to engine content.
 
-The full explanation is in [`../map-making/guide.md`](../map-making/guide.md).
+The long explanation is in [`../map-making/guide.md`](../map-making/guide.md).
 
-## Try it without building
-[`prebuilt/zzz_ITRMap_Example_P.pak`](prebuilt/) (343 KB, SHA-256 `a4b5eccd579f981e4d02ed7051d48e32c37d7ae1e017d3a7d9c37786e5b17dfc`)
-is this map, built with the special editor. To use it, follow the five steps in
-[the repository README](../README.md#try-the-example-map-10-minutes-no-editor): install
-UE4SS and the loader, copy the pak, Continue into the Hub, and leave by stepping on the exit pad.
+## Just want to try it?
+[`prebuilt/zzz_ITRMap_Example_P.pak`](prebuilt/) is this map already built with the special editor (343 KB,
+SHA-256 `a4b5eccd579f981e4d02ed7051d48e32c37d7ae1e017d3a7d9c37786e5b17dfc`). The steps for installing UE4SS, the
+loader and the pak are at the top of [the main README](../README.md#example-map-test).
 
-## Build it
-1. Copy this folder somewhere. It's a blueprint-only project; `Content/` is created by step 3.
-2. Get the game's config. The project's `DefaultEngine.ini` must be the game's own:
+## Building it yourself
+1. Copy this folder somewhere. It's a blueprint-only project, and `Content/` gets created in step 3.
+2. Get the game's `DefaultEngine.ini` into the project:
    ```powershell
    .\extract-game-config.ps1 -Engine "C:\ue427\Engine"
    ```
-3. Generate the map. Either open `IntoTheRadius.uproject` in the editor and run **File → Execute Python Script →
-   `Scripts\build_example.py`**, or headless:
+3. Make the map. Either open `IntoTheRadius.uproject` and run `Scripts\build_example.py` from File, Execute Python
+   Script, or run it headless:
    ```bat
    C:\ue427\Engine\Binaries\Win64\UE4Editor-Cmd.exe <path>\IntoTheRadius.uproject -run=pythonscript -script=<path>\Scripts\build_example.py -nullrhi
    ```
-   It creates:
-   - the material `/Game/Mods/Example/M_ExampleGrid`;
-   - the editor-only host level `/Game/Mods/Example/L_ExampleHost`;
-   - the map `/Game/Mods/Example/L_Example`.
-4. Build the navmesh. It has to run in the editor, not a commandlet. Either run **File → Execute Python Script →
-   `Scripts\build_navmesh.py`** in the open editor, or unattended:
+   That creates the material `/Game/Mods/Example/M_ExampleGrid`, an editor-only host level
+   `/Game/Mods/Example/L_ExampleHost`, and the map itself, `/Game/Mods/Example/L_Example`.
+4. Build the navmesh. This needs the full editor, a commandlet won't do it. Either run `Scripts\build_navmesh.py`
+   from File, Execute Python Script, or start the editor unattended:
    ```bat
    C:\ue427\Engine\Binaries\Win64\UE4Editor.exe <path>\IntoTheRadius.uproject "-ExecCmds=py <path>\Scripts\build_navmesh.py" -ITRQuit
    ```
-   The log should read `navmesh built and saved ... ['RecastNavMesh-Default', 'RecastNavMesh-Big']`.
-   Don't use `-ExecutePythonScript=`: that closes the editor as soon as the script returns, before the build.
-5. Cook, pack and install (game closed):
+   You should see `navmesh built and saved ... ['RecastNavMesh-Default', 'RecastNavMesh-Big']` in the log. Don't use
+   `-ExecutePythonScript=` for this one, it closes the editor before the build gets a chance to run.
+5. Cook, pack and install it (with the game closed):
    ```powershell
    .\build-map.ps1 -Engine "C:\ue427\Engine" -Install
    ```
-6. Enter it with the [loader](../loader-ue4ss/). Go to the Hub first.
+6. Load it with the [loader](../loader-ue4ss/). You need to be in the Hub.
 
-To make your own map, change `FOLDER`, `HOST` and `MAP` at the top of both scripts (or build by hand), and pass
-`-Map <Name>` to `build-map.ps1`.
+To turn it into your own map, change `FOLDER`, `HOST` and `MAP` at the top of both scripts (or just build in the
+editor by hand), and pass `-Map <Name>` to `build-map.ps1`.
 
-## What has been tested (October 2026)
-- **Build:** steps 2–5 with the special editor: material compiled to 30 shaders, navmesh saved into the map, pak 343 KB.
-- **In the game (VR through SteamVR, and desktop):** the UE4SS loader streamed the map in from the Hub and
-  teleported the player to the start. The checker floor renders correctly. The navmesh works: three enemies spawned
-  40 m ahead stood on it, and a 15 m path resolved. Stepping on the exit pad returned the player to the Hub and
-  unloaded the map.
-- **Not tested:** building with stock 4.27.2 (`OWN_MATERIAL = False`).
+## What we tested (October 2026)
+- Steps 2 to 5 with the special editor. The material compiled to 30 shaders, the navmesh got saved into the map, and
+  the pak came out at 343 KB.
+- In VR, loaded from the Hub with the UE4SS script: the checker floor looks right, you land on the start marker, three
+  enemies we spawned 40 m away stood on the navmesh, and the exit pad took us back to the Hub and unloaded the map.
+- We haven't tried building it with stock 4.27.2 (`OWN_MATERIAL = False`).

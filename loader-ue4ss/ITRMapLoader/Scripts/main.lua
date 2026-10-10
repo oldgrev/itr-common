@@ -1,11 +1,11 @@
--- ITRMapLoader: streams a custom map into Into the Radius 1 (2.7.2) and moves the player to its start marker.
--- Tested with UE4SS 3.0.1 (the Nexus Mods ITR build), game 2.7.2: auto-load in the Hub, streaming, teleport.
--- What it does (the same steps a native loader needs, see the map-making guide):
---   1. in the Hub, stream the map in at the origin (maps are built at their final world position). Natively that is
---      LevelStreamingDynamic::LoadLevelInstance; see Load() for why this script builds the streaming entry itself;
---   2. when the level is visible, find the TargetPoint carrying StartTag and AActor::K2_TeleportTo the player there;
---   3. optionally hide the Hub's lighting-scenario level (maps with baked lighting);
---   4. the same key again unloads it and restores the lighting scenario.
+-- ITRMapLoader: gets you into a custom map in Into the Radius 1 (2.7.2) and back out again.
+-- Tested in VR with UE4SS 3.0.1 (the Nexus Mods ITR repack). See README.md.
+-- Roughly:
+--   1. once you're in the Hub, stream the map in at the origin (maps are built where they'll sit in the world).
+--      Normally you'd use LevelStreamingDynamic::LoadLevelInstance, but UE4SS can't call it, see Load();
+--   2. when the level's visible, teleport the player to the TargetPoint tagged StartTag;
+--   3. for maps with baked lighting, hide the Hub's lighting-scenario level;
+--   4. stepping near an ExitTag marker (or pressing the key again) moves you back to where you were and unloads it.
 
 local UEHelpers = require("UEHelpers")
 local Config = require("config")
