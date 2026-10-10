@@ -64,3 +64,10 @@ A few notes:
     shader code compiled from Epic's shaders in it, so the Unreal Engine EULA applies to it rather than our licence.
   - [`data/ub/`](data/ub/), which is just data read from the game's exe. We don't claim any licence over it.
 - Maps you build with the example scripts are your own work; the AGPL covers the scripts, but I've no idea how it all accumulates for your own maps etc.
+
+## Obligatory AI Usage info
+AI writes code about 10x quicker than me and it is often less frustrating than banging my head against why unreal editor wont build for hours on end(only to learn I didn't need *that* component to build anyway) and then needing to learn the ins and outs of shaders to make code edits to generate the right format used by the original game.... So in this case it made a lot happen that wouldn't have happened otherwise and the caveat that that comes with is that the 'owner' of the code in this instance(and probably most instances imho) does not have the depth of knowledge that you'd want. But this is just a basic capture of "how to make a map including your shaders/mats" so it's better to have han not to I hope.
+
+Also the documentation... writing documentation for a repo no one will ever see is unmotivating and so without ai usage it's unlikely to have materialized.
+
+Hopefully I've managed to cross examine and challenge the AI coding assistants enough that the solutions within are somewhat more robust than average, but I'm sure everyone says that... 
