@@ -47,6 +47,7 @@ What's where:
 | [`loader-ue4ss/`](loader-ue4ss/) | The UE4SS Lua script that gets you into a custom map and back out | Yes, VR and desktop |
 | [`engine/`](engine/) | Our patch for the Oculus UE 4.27 fork so it compiles shaders the game can use. It doesn't contain any of Epic's code; apply it with `tools/hashpatch.py` | Yes, it gives the same engine we built |
 | [`tools/`](tools/) | `merge_gitdeps.py` to get the fork's dependencies downloading, `hashpatch.py`, and tools for pulling shader layouts out of the exe and looking at compiled shaders | We used all of them |
+| [`tools/material-export/`](tools/material-export/) | Reads a cooked game material or material instance into JSON (parent, parameters, static switches, overrides, texture settings), and an editor script that rebuilds the instance in your project. A master's graph isn't in the cooked file, so masters come out as stand-ins | Export side: compared with the SDK on 300 materials, offline. Editor script: **not run in an editor yet** |
 | [`data/ub/`](data/ub/) | The game's shader parameter layouts, read out of `IntoTheRadius-Win64-Shipping.exe` 2.7.2 | |
 
 A few notes:

@@ -6,7 +6,10 @@ that aren't are Unreal Engine itself, UE4SS, and the community ITR-SDK if you wa
 If you want to spawn things at runtime, mess with lighting from a mod and so on, that's in [`extended.md`](extended.md).
 
 Where we say *tested* we've done it in game. *Untested* means written but never run, and *unexplored* means nobody
-has tried it as far as we know.
+has tried it as far as we know. Newer parts use finer labels: *VR-tested* means someone wore the headset,
+*harness-tested* means the game ran with `-nohmd` under a script that sent commands and checked the game's state and
+log with nobody watching (see [`extended.md`](extended.md)), and *offline only* means we checked files or ran tools
+but never the game.
 
 ## 0. Do you need the special editor?
 Probably only if you want your own materials.
@@ -48,7 +51,8 @@ Things that do, so you need route B:
 - The **ITR-SDK** by ChuckSharts (Dec 2023), if you want the game's materials, meshes or prefabs in your map. It's
   linked from Pecho's Mods "The Basics" guide (pechomods.com). When we last looked, the link was
   https://drive.google.com/file/d/1yPFEPYuxcBEV3NKYOZnAxRIyEIQFFygn/view. One warning: its master materials are
-  reconstructions, not the real graphs. Reference them, but don't cook your own copies.
+  reconstructions, not the real graphs. Reference them, but don't cook your own copies. There are other copies of the
+  SDK around (R3mains has one with a newer module, for example). For the gameplay blueprints in §4, use ChuckSharts's.
 - Something to load the map. The game can't enter custom maps yet, so we use UE4SS plus a small Lua script (§6).
 
 ## 2. Set up the project
@@ -163,9 +167,28 @@ the navmesh (below). The script is short and worth reading alongside this. The e
 
 A few rules we worked out:
 - **Where it goes.** Put the map at `/Game/Mods/<Name>/L_<Name>`. Sublevels are fine.
-- **Where it sits in the world.** Build it where it'll actually be in game, and keep it away from the game's navmesh
-  volumes (X −435,000 to 698,000, Y −219,000 to 646,000 cm). The example sits at (0, −600,000, 0) cm. The loader
-  streams it in at zero offset because navmesh tiles are stored in absolute coordinates.
+- **Where it sits in the world.** Build it where it'll actually be in game, because the loader streams it in at zero
+  offset (navmesh tiles are stored in absolute coordinates). Three things decide where that can be:
+  1. *The game's navmesh volumes.* Keep clear of X −435,000 to 698,000, Y −219,000 to 646,000 cm. The example sits at
+     (0, −600,000, 0) cm, south of them.
+  2. *The Hub's level radius.* The Hub config has a `MaxLevelRadius` of 6000 m around the Hub's level centre,
+     (−34,500, −2,353) cm. Go outside it and you get a loading screen, then the Hub, then eventually a crash. We saw that
+     10 km out with the ITR 1.0 map (VR), where our mod had to lift the limit. Keep the whole map inside 600,000 cm of
+     that point and you don't have to touch it. The example is about 5.99 km away, so it only just makes it. The
+     showcase map's far corner is about 5 km out.
+  3. *The snap-back west of X ≈ −30,000.* While the Hub's streaming levels are loaded, a player standing west of about
+     X −30,000 gets sent back to the Hub in under a second. We hit it in VR with the showcase map. The example map is
+     at X = 0 so it never noticed. It isn't the radius limit. When we unloaded every Hub streaming level it went away,
+     so the cause lives somewhere in those levels (not `L_Common`, not game code), and we haven't worked out which
+     level or why.
+
+  The fix for 3 is to get rid of the Hub while your map is loaded: put the player on a spot on your map east of about
+  X −20,000, unload every other streaming level, wait until they're gone, and only then move the player to the real
+  start. The exit has to bring the Hub back (§6). *Harness-tested* on the showcase map: after the teardown the player
+  stayed put for 20 s, and teleport points across the 2.5 km map each held for 10 s. We haven't been back in VR since
+  the fix. The UE4SS loader has this built in, but it's untested in its Lua form (see the
+  [loader README](../loader-ue4ss/README.md)). It also takes the Hub's fog and lighting away, so give your map its own.
+  We expect that to be a good thing but haven't looked at it in VR.
 - **Start and exit.** Put a `TargetPoint` tagged `itr:player_start` where players should arrive (Details, Actor,
   Tags). Add another tagged `itr:exit`, with something visible on it. Stepping onto that one takes you back to the
   Hub (§6).
@@ -174,17 +197,62 @@ A few rules we worked out:
   Content in any editor, and the game has them too. Turn off collision and shadows on it.
 - **Lighting.** Movable lights work. Exposure is EV100 with auto exposure off. From the Hub, roughly a 2-lux sun and
   a 0.6 sky light looked about right. For baked lighting see §7.
-- **Fog.** Height fog is global, so the Hub's fog also covers your map.
+- **Fog.** Height fog is global, so the Hub's fog also covers your map, unless you've torn the Hub down (above).
 - **Using the game's materials and meshes.** Copy the asset and whatever it references from the SDK's `Content` into
   your project at the **same path**, use it, and only pack `/Game/Mods/<Name>`. In game, the game's copy gets loaded
   instead of yours. Only plain material instances work this way (see §0). We've tried static meshes, foliage meshes
   and the `Prefab_Zone_*` blueprints (which are just engine components). Anything you place this way is included in
-  your navmesh.
-- **Gameplay blueprints** (spawners, stashes, loot points, items). Their C++ parents live in the game's
+  your navmesh. If the SDK's copy of a material instance is missing or stale (it has stripped textures, wrong
+  parents and some outdated static switches), [`tools/material-export`](../tools/material-export/) reads the real
+  instance from the game's own files and rebuilds it in the editor (export side checked, editor script untested).
+- **Stand-ins for game meshes that aren't in any SDK.** See "Editor stand-ins" below.
+- **Gameplay blueprints** (spawners, rifts, stashes, loot points, anomalies). Their C++ parents live in the game's
   `IntoTheRadius` code module, and a blueprint-only project can't load that. The ITR-SDK has a recreation of the
-  module (`Source/IntoTheRadius`, built for stock 4.27). Building that into your project should let you place the
-  SDK's gameplay blueprints directly, and placed actors get stable names, which the save system needs. Nobody has
-  tried that yet as far as we know. In the meantime, [`extended.md`](extended.md) covers spawning them at runtime.
+  module (`Source/IntoTheRadius`): the real class, property and function declarations, with empty function bodies. That
+  is all the editor needs to load the blueprints. The game uses its own real module, so none of this gets packed.
+  *Harness-tested*, not yet looked at in VR:
+  - **Compiling it.** Copy `Source/IntoTheRadius` and the plugins it needs (`VRExpansionPlugin`, `ModFramework`) from the
+    SDK into your project, copy the SDK's `.Target.cs` files, list the module in your `.uproject`, and build the editor target with the patched fork. It
+    built with no errors in 87 s in a scratch project (and 67 s in the showcase project). The project is then a code
+    project, and `build-map.ps1` is still fine because it only packs `/Game/Mods/<Name>`.
+  - **Which SDK's blueprints.** Use ChuckSharts's. R3mains's copies of the same blueprints reference its own mod
+    content (`/Game/Mods/r3mains/...`), which then wants to come along with your map. Copy each blueprint with
+    whatever it references, at the same paths, like any other game asset.
+  - **Placing them from Python.** `EditorLevelLibrary.spawn_actor_from_object(<blueprint asset>, location, rotation)`
+    works, also headless. Calling `spawn_actor_from_class` without a rotator crashed our headless editor, and so did
+    spawning the native `CoverLoader` class directly (we made a tiny blueprint subclass of it instead).
+  - **Names.** Placed actors get stable names, which the save system builds its keys from (`<Level>><Actor>`).
+    Whether those keys work for a level that's streamed in as a dynamic instance is unknown.
+  - **They don't start by themselves.** In the harness, `BP_MonsterSpawner`, `BP_MonsterSpawnGenerator`, loot points,
+    stashes and anomalies placed in a streamed map sat idle. The game sends them level-start events when it loads its
+    own levels, and a streamed one has missed them. With the activation calls in
+    [`extended.md`](extended.md) (a runtime mod, or the UE4SS loader): 2 Mimics spawned and stood on the navmesh, and
+    loot points produced items.
+
+  The earlier way, spawning things from markers at runtime, is still in [`extended.md`](extended.md) but you won't
+  want it for spawners, stashes and loot any more.
+
+### Editor stand-ins (for game assets that aren't in any SDK)
+About two thousand of the game's assets are in none of the SDKs we looked at, among them the tower crane, vehicles, and
+a lot of tunnel, cave and pier meshes. The cooked map only stores asset *paths* for things it references, and the pak
+only holds `/Game/Mods/<Name>`. So the editor only needs *something* at the identical package path to place, size and
+collide against. In game the real asset gets loaded in its place.
+
+Our `standins.py` does that for static meshes. It reads the mesh out of the game's own files (you unpack them yourself),
+writes an FBX with the game's simple collision, material slot names and lightmap settings, and imports that at the
+same `/Game/...` path in a scratch project with a plain grid material. Each one is tagged `itr_standin=1`, so the tool
+never overwrites a real SDK copy. A few rules:
+- Stand-ins do get cooked, into `Saved/Cooked/...`, when your map uses them. Only the pak filter keeps them out of the
+  pak. The tool has a `checkpak` command that fails if a pak holds anything outside `Content/Mods` or at a stand-in's
+  path. Run it on your final pak.
+- `verify` fails a stand-in whose size or pivot is more than 1 % off the real mesh.
+- Static meshes only, LOD0 only. Not skeletal meshes, blueprints (the meshes inside can be stood in, but the class
+  can't), materials, textures or sounds. Baked lighting from a stand-in is a placeholder.
+
+Status: *offline only*. We did seven crane meshes: bounds within 1 % of the real ones, the cooked map's import table
+named the original `/Game` paths, and the pak had nothing but `/Mods` in it. We haven't looked at the result in the
+game yet. The tool lives in the showcase repo (`itr-showcase`) for now, not in this one. It depends on a CUE4Parse
+exporter of ours as well.
 
 ### Navmesh (tested)
 NPCs can only walk on navmesh, and the game never builds any at runtime (`RuntimeGeneration=DynamicModifiersOnly`).
@@ -257,7 +325,8 @@ That's the only runtime code a map like this needs.
 We use a UE4SS Lua script, [`loader-ue4ss/`](../loader-ue4ss/). It loads your map automatically when you arrive in
 the Hub (handy in VR) or when you press a key. Its README covers installing it. Follow the manual install on the
 Nexus page: the **contents** of the zip's `ue4ss` folder go into `Content\Paks`, and `Mods` gets renamed to
-`LuaMods` there. We tested it in VR.
+`LuaMods` there. We tested it in VR. That was the original version, which has since gained a Hub teardown, several exits,
+re-entry and gameplay activation. Those parts are untested in Lua (the loader README has the details).
 
 If you want to write your own loader, this is what it has to do. Everything here is a blueprint-callable engine
 function.
@@ -275,9 +344,28 @@ function.
 3. For maps with baked lighting, hide the Hub's lighting-scenario level (see §7).
 4. Give people a way out. Our script remembers where you were, and when you step within 1.5 m of a `TargetPoint`
    tagged `itr:exit` (or press the key), it moves you back there and then unloads the map. Put an exit in every map,
-   because in VR there's no other way back apart from quitting to the menu.
+   because in VR there's no other way back apart from quitting to the menu. (If you tore the Hub down, step 6 changes
+   how this goes.)
 5. To unload, call `SetShouldBeVisible(false)` and `SetShouldBeLoaded(false)` on the streaming level, after you've
-   moved the player off it.
+   moved the player off it. Never before: the first time we unloaded a map under the player in VR they fell into the
+   void and then ended up at the main menu.
+6. **If your map reaches west of X −30,000 (§4), tear the Hub down.** *Harness-tested* (in our C++ mod, not in a Lua
+   port yet), after a VR attempt without it failed:
+   1. Stream the map in and wait until it's visible.
+   2. Teleport the player to a `TargetPoint` on your map with world X greater than about −20,000 (the loader takes
+      one tagged `itr:tp:*`, `itr:arrive*` or `itr:exit_id*`, nearest the start).
+   3. Wait until the player is standing on your map's ground. Ask the pawn for its movement base, up to 15 s.
+   4. Call `SetShouldBeVisible(false)` and `SetShouldBeLoaded(false)` on every other streaming level, and wait until
+      they're all unloaded. Leave any level that holds the player's pawn or controller.
+   5. Only now teleport to the real start.
+
+   **Leaving** with the Hub gone: while the player is still on your map, call the game's own
+   `LevelManager::LoadLevel(Level.Hub)`. It takes a gameplay tag by value, so it isn't hit by the out-parameter bug
+   above. Wait until the Hub is visible and the level manager is ready, and check the player ended up in the Hub. If the
+   game didn't move them, teleport them back to where they stood. The game's Hub load **leaves your streamed map
+   loaded**, so unloading it afterwards is your job (and only once the player isn't standing on it). In the harness
+   that exit worked, the player ended in `Level.Hub` with the Hub levels visible, and the map was gone. If you
+   do all this, it's easiest to let [`loader-ue4ss/`](../loader-ue4ss/) do it, though its version hasn't run yet.
 
 Working out when you're really in the Hub is fiddlier than it sounds. While you're coming from the menu, the Hub level
 shows as visible even though you're still standing in the menu room. Our script also waits for
@@ -292,10 +380,13 @@ shows as visible even though you're still standing in the menu room. Our script 
 | Movable lights, sky dome, post-process volumes | Works. Fog is shared with the Hub |
 | Baked lighting | Loads (we tried it with a rebuilt level), but the loader has to hide the Hub's lighting-scenario level. While that's visible, the engine reads every level's lightmaps from it. Find it in `World.StreamingLevels` (its loaded level has `bIsLightingScenario` set), call `SetShouldBeVisible(false)`, and put it back when you unload. We haven't judged how good it looks yet |
 | Navmesh | Works (§4) |
-| Placing gameplay blueprints in the editor | Untested (§4) |
+| Maps outside the Hub's 6000 m radius, or west of X −30,000 | Radius: the map has to stay inside, or a mod lifts the limit (VR-tested for the 1.0 port). West of −30,000: needs the Hub torn down (§4, §6). Harness-tested |
+| Placing gameplay blueprints in the editor | Works (§4). Harness-tested |
+| Making placed spawners, loot, stashes and anomalies actually start | Needs a runtime mod to send the level-start events ([`extended.md`](extended.md)). Harness-tested |
+| Your own loot tags and budgets | Registering them at load worked in the harness; shipping your own loot DataTables is in progress ([`extended.md`](extended.md)) |
 | Getting into the map | Needs a loader (§6) |
-| Gates and travel, map screen, missions, loot tables, saves | Not available. These are all per-zone data assets (`DA_SystemConfig.LevelConfigurations`, `DA_MapPointsConfig`, `/Game/ITR/Configurations/Missions`, `/Game/ITR/Configurations/Loot/<Zone>`). Registering a map there (a level config entry, a streaming entry, gates, map points) might let the game treat it like a normal zone, saves and travel included. That would mean overriding the game's data assets. Unexplored |
-| AI cover (mimics taking cover) | Not available. Zones come with baked cover data and we don't know how the game generates it |
+| Gates and travel, map screen, missions, saves | Not available. These are all per-zone data assets (`DA_SystemConfig.LevelConfigurations`, `DA_MapPointsConfig`, `/Game/ITR/Configurations/Missions`). Registering a map there (a level config entry, a streaming entry, gates, map points) might let the game treat it like a normal zone, saves and travel included. That would mean overriding the game's data assets. Unexplored |
+| AI cover (mimics taking cover) | The data format is understood and we have an offline generator, but nobody has seen a mimic use it yet ([`extended.md`](extended.md)). Offline only |
 
 ## 8. When things go wrong
 - Crash reports end up in `%LOCALAPPDATA%\IntoTheRadius\Saved\Crashes\` (`CrashContext.runtime-xml` plus a
@@ -325,6 +416,10 @@ shows as visible even though you're still standing in the menu room. Our script 
 | Mod DLLs stay locked after a crash | `CrashReportClient.exe` is holding them | Close it before copying files |
 | UE4SS logs `StrProperty can only be set to a string or FString` | UE4SS 3.0.1 reads the wrong argument after a non-struct out-parameter | Avoid those functions. Our loader uses `CreateInstance` instead of `LoadLevelInstance` |
 | The map loads while you're still in the menu room | The Hub level counts as visible during the transition | Wait for `LevelManager::IsReady()` (our loader does) |
+| You arrive and get thrown back to the Hub within a second, but only on part of the map | The snap-back west of X ≈ −30,000 while the Hub's levels are loaded (§4) | Tear the Hub down (§6 step 6), or move the map east |
+| Spawners, loot points, stashes or anomalies you placed do nothing in game | A streamed level misses the level-start events the game sends its own levels | Send them yourself ([`extended.md`](extended.md)) |
+| Headless editor crashes spawning an actor | `spawn_actor_from_class` without a rotator, or spawning a native class like `CoverLoader` directly | Use `spawn_actor_from_object` with a blueprint asset (§4) |
+| Unloading the map after an exit leaves you in the void | You unloaded the level under the player | Move the player first, and use the game's own Hub load on the way out (§6) |
 
 ## What's in the repo
 | Path | What |

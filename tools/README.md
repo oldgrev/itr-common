@@ -25,6 +25,9 @@
 - **`dxbc_disasm.py <pkg.uexp> [--freq VS] [--grep RE] [--out DIR]`**
   Disassembles the compiled shaders in a cooked package using Windows' `d3dcompiler_47.dll`.
 
+- **[`material-export/`](material-export/)**
+  Exports a cooked material or material instance to JSON and rebuilds it in the editor. Has its own README.
+
 ## Where `data/ub` came from
 We made it with:
 ```
