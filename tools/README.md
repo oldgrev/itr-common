@@ -26,7 +26,7 @@
   Disassembles the compiled shaders in a cooked package using Windows' `d3dcompiler_47.dll`.
 
 - **[`material-export/`](material-export/)**
-  Exports a cooked material or material instance to JSON and rebuilds it in the editor. Has its own README.
+  Exports a cooked material or material instance to JSON and rebuilds it in the editor. Has a separate README.
 
 ## Where `data/ub` came from
 We made it with:

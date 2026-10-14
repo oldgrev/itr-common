@@ -1,4 +1,4 @@
-"""Minimal reader for cooked Unreal Engine 4.26 / 4.27 packages (.uasset + .uexp), as shipped in Into the Radius 1.
+"""Minimal reader for cooked Unreal Engine 4.26 / 4.27 packages (.uasset + .uexp), as used in Into the Radius 1.
 
 Reads the package header (name map, imports, exports) and the tagged properties of an export. That is all
 `material_export.py` needs. It does not read bulk data, textures, meshes, compressed packages or unversioned

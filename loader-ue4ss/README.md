@@ -6,10 +6,13 @@ can't load custom maps yet, so you need something like this to get into one.
 When you arrive in the Hub (or press a key), it streams your map in and moves you to the map's start marker. When
 you step on one of the map's exit markers, it takes you back to the Hub and unloads the map.
 
+A copy of this loader configured for a large map (with its loot manifest, `AutoLoadInHub`) is in
+[`itr-showcase/loader`](../../itr-showcase/loader/).
+
 ## What's new (untested in Lua)
 The Hub teardown, multiple exits, the re-entry memory, gameplay activation and loot registration were added after the
 testing described below. **None of the new parts of this Lua loader have been run through a Hub load yet.** They are
-ports of what our C++ mod (aiMod) does. aiMod's versions of the Hub teardown, the exit through the game's own Hub load,
+ports of what our C++ mod (aiMod) does. aiMod's versions of the Hub teardown, the exit through the game's Hub load,
 and the gameplay activation have since passed our `-nohmd` harness runs (an automated game run with scripted checks, see
 [`extended.md`](../map-making/extended.md)), but not VR. The loot registration passed the harness too, in aiMod's C++
 form. What has been seen of the Lua one: with UE4SS installed in the standard layout (below), alongside aiMod, a
@@ -21,7 +24,7 @@ through Lua hasn't happened yet.
 - **Re-entry memory.** The loader remembers which exit (by id) you left through, and next time puts you at the
   matching arrive marker.
 
-- **Gameplay activation.** About 3 s after you arrive, the map's own gameplay actors (loot points, stashes, anomalies,
+- **Gameplay activation.** About 3 s after you arrive, the map's gameplay actors (loot points, stashes, anomalies,
   monster spawners and generators; everything that derives from `PRBasicActor`) are sent the level-start events the
   game only fires for levels it loads itself. Without it, a streamed map's spawners, loot and anomalies sit idle.
   Port of what aiMod does (the harness-tested C++ version; [`extended.md`](../map-making/extended.md) has the write-up), untested in this loader. See "Gameplay activation".
@@ -167,7 +170,9 @@ Maps are streamed in after the Hub already went through its level-start events, 
 never receive them. When the player has arrived (or the teardown gave up), the loader waits 3 s for the actors'
 BeginPlay and then, for every `PRBasicActor` whose level is your map:
 1. `OnLevelPrepare(<level tag>)` (spawner generators check whether they are excluded; one that is destroys itself),
-2. on loot points (`BP_LootSpawnPoint_C` and its children, which includes stashes): `GenerateLoot()` then `SpawnLoot()`,
+2. on loot points (`BP_LootSpawnPoint_C` and its children, which includes stashes): `GenerateLoot()` only. The game's
+   distance check (armed by `OnLevelPrepare`) spawns a point's items once the player is within `LootSpawnDistance`; calling
+   `SpawnLoot()` as well spawns every item twice. A point that already spawned its items gets no `OnLevelPrepare`,
 3. `OnLevelStarted(<level tag>)` (stash doors, anomalies), `OnGameStarted()`, `OnTransitionEnd()` (spawners and generators go live).
 
 Each call goes through the actor, so Blueprint overrides run. The level tag is the game's current one (`Level.Hub` while
@@ -175,12 +180,16 @@ the Hub is torn down). The game's global events are not fired, because the game 
 them too. Actors that destroyed themselves are skipped by the later steps. `UE4SS.log` shows every call
 (`[ITRMapLoader] activate: ...`), a count per class, and a one-line summary ending in `errors N`.
 - `ActivateGameplay = false` (global or per map) turns it off.
-- Loot comes from the vanilla `Loot.*` tags and budgets unless your map has its own. A loot manifest registers your own:
+- Loot comes from the vanilla `Loot.*` tags and budgets unless your map has custom ones. A loot manifest registers your own:
   put `<Map Name>.loot.json` next to `main.lua` (or `LootManifest = "<path>"` on the map entry; a `.loot.lua` file
   returning the same table works too). Just before the activation, `RegisterLootTags` adds each manifest tag
   (`tag`, `source_tag` donor, `loot_points`, optional `table_asset`) to the game config's `LootArray` with `TMap:Add`,
-  taking the donor's DataTable (shared used points) unless the map pak ships the `table_asset`. Same as aiMod's
+  taking the donor's DataTable (shared used points) unless the map pak includes the `table_asset`. Same as aiMod's
   `Loot.cpp`, which writes the TMap's memory by hand instead. Each add is read back and logged (`loot: tag ... added`).
+  The map's tables must be kept alive by the map itself (Lua cannot add them to the GC root set): place one actor whose
+  `Tables` array (instance-editable, `DataTable` object references) lists them, class `BP_ItrShowcase_LootTables` in the
+  showcase. The loader takes the tables from that actor, re-points the entries at each load and points them back at the
+  donor tables on unload, so `LootArray` never holds a collected table.
   `LootRetagShim = true` is a dev-only helper for the ITR Showcase map (retags its `G2_*` loot nodes and generator).
 - Whether this works through UE4SS Lua is not tested. Things most likely to need a fix on the first run: calling the
   functions through the object (`A[Fn]`), the by-value `FGameplayTag` argument, and reading the level tag from
@@ -188,7 +197,7 @@ them too. Actors that destroyed themselves are skipped by the later steps. `UE4S
 - `RequireLevelManagerReady = false` is for desktop `-nohmd` test runs only: the game never reports its level manager
   ready there, so the "are we in the Hub" check never passes without it.
 
-Testing this next to aiMod means switching aiMod's own map handling off so the two don't both manage the map. That's
+Testing this next to aiMod means switching aiMod's map handling off so the two don't both manage the map. That's
 done on our side and not part of this repo.
 
 ## Why the Hub teardown exists
@@ -212,7 +221,7 @@ So while a map is loaded, the loader replaces the Hub, in this order (it mirrors
 If a Hub level doesn't unload, the player stays at the staging point and the exit still works.
 
 **Leaving** with the Hub gone:
-1. While the player still stands on the map, call the game's own `LevelManager::LoadLevel(Level.Hub)`. It takes a
+1. While the player still stands on the map, call the game's `LevelManager::LoadLevel(Level.Hub)`. It takes a
    gameplay tag by value, so the out-parameter bug above doesn't affect it. If nothing happens within 4 s, the game
    probably believes it's still in the Hub, and the loader tries `TransferToLevel(Level.Hub, None)` on the game mode.
 2. Wait until the Hub's main level is visible and the level manager is ready.

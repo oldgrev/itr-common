@@ -24,7 +24,7 @@ Things the editor's Python API can't do (layer parameters, static component mask
 listed in the report instead. Static switches need the MaterialEditingLibrary function from our engine patch
 (`set_material_instance_static_switch_parameter_value`, see ../../engine/); without it they are listed too.
 
-Assets are created under --dest, not at the game's paths: an asset at the game's own path inside a pak would
+Assets are created under --dest, not at the game's paths: an asset at the game's path inside a pak would
 shadow the game's original. Nothing is cooked or packed here.
 A report goes to <project>/Saved/matexport_report.json and the Output Log.
 Licence: AGPL-3.0 (see ../../LICENSE).
@@ -171,7 +171,7 @@ def make_placeholder(tex_path, settings):
 
 
 def texture_for(tex_path, tex_settings):
-    """The project's own texture at the exported path, a DEST mirror, or a placeholder."""
+    """The project's texture at the exported path, a DEST mirror, or a placeholder."""
     if not tex_path:
         return None
     pkg = tex_path.split(".")[0]
@@ -244,7 +244,7 @@ def build_stub_master(link, tex_settings):
         if tex:
             n.set_editor_property("texture", tex)
         row += 1
-    # Static switches are not in a cooked master's parameter list; the instances' own switch lists tell us the names.
+    # Static switches are not in a cooked master's parameter list; the instances' switch lists tell us the names.
     # An instance can only keep a switch its parent declares, so the stand-in declares them (default False: unknown).
     for sw in sorted(SWITCHES.get(link["package"], ())):
         n = X(unreal.MaterialExpressionStaticSwitchParameter, -1300, row * 80)
@@ -283,7 +283,7 @@ def apply_overrides(mi, active, name):
 
 
 # EMaterialParameterAssociation as the engine numbers it: LayerParameter 0, BlendParameter 1, GlobalParameter 2
-# (the patched function's own default of 0 is the LAYER one, so always pass the association).
+# (the patched function's default of 0 is the LAYER one, so always pass the association).
 ASSOCIATION = {"LayerParameter": 0, "BlendParameter": 1, "GlobalParameter": 2}
 
 
@@ -361,7 +361,7 @@ def collect_switches(x):
 
 
 def resolve_parent(link, chain_by_pkg, tex_settings):
-    """Parent asset for an instance export: the project's own, else something built from the chain, else the fallback."""
+    """Parent asset for an instance export: the project's, else something built from the chain, else the fallback."""
     ppath = link.get("parent")
     if not ppath:
         return None

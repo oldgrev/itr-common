@@ -52,7 +52,7 @@ What's where:
 
 A few notes:
 - There's no Unreal Engine source in here. The patch refers to the lines it changes by hash and line number and only
-  contains our own lines, so you need your own copy of the engine source to apply it.
+  contains our lines, so you need your own copy of the engine source to apply it.
 - `data/ub` is just names, offsets and sizes from the game's exe. There are no game assets in this repo.
 - The Python tools need Python 3, and some need `pip install pefile capstone lz4`.
 

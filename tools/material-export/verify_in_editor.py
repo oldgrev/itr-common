@@ -169,7 +169,7 @@ def verify_texture(path, s):
         return
     t = eal.load_asset(dest_of(path)) if eal.does_asset_exist(dest_of(path)) else None
     if not t:
-        return                                                      # the project had its own texture there
+        return                                                      # the project had a texture there
     check("%s compression" % path, enum_value(unreal.TextureCompressionSettings, s["compression"]), t.get_editor_property("compression_settings"))
     check("%s sRGB" % path, bool(s["srgb"]), bool(t.get_editor_property("srgb")))
     check("%s lod group" % path, enum_value(unreal.TextureGroup, s["lod_group"]), t.get_editor_property("lod_group"))

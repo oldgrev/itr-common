@@ -10,8 +10,8 @@
 --   3. stepping near any ExitTag marker (or pressing the key again) takes you back to the Hub. With the teardown that
 --      means asking the game to load the Hub (LevelManager::LoadLevel) while you still stand on the map;
 --   4. leaving through an exit that has an id is remembered, and the next entry arrives at the matching arrive marker.
---   5. (ActivateGameplay) ~3 s after arrival the map's own gameplay actors (loot, stashes, anomalies, spawners,
---      generators) get the level-start events they missed: OnLevelPrepare, GenerateLoot + SpawnLoot, OnLevelStarted,
+--   5. (ActivateGameplay) ~3 s after arrival the map's gameplay actors (loot, stashes, anomalies, spawners,
+--      generators) get the level-start events they missed: OnLevelPrepare, GenerateLoot (the native distance check spawns the items), OnLevelStarted,
 --      OnGameStarted, OnTransitionEnd, called on each actor in the map's level (port of aiMod ActivateModMapGameplay).
 -- This file avoids Lua 5.4-only syntax so `luac5.1 -p` can check it.
 
@@ -42,24 +42,80 @@ local ArrivePrefix = Config.ArriveTagPrefix or "itr:arrive:"
 local HubLevelTag = Config.HubLevelTag or "Level.Hub"
 local StagingMaxWestX = Config.StagingMaxWestX or -20000
 
+-- Wall-clock milliseconds. The loops below measure their waits with this, never by counting ticks: a tick count assumes
+-- every LoopAsync tick runs its game-thread callback on time (it did not, see lua-loader-test-plan.md, run B2).
+local function Now() return os.clock() * 1000 end
+
 -- Runs fn on the game thread every ms until it returns true (or throws). LoopAsync runs on another thread, so the
--- stop flag is only seen one round after the game thread set it.
-local function Every(ms, fn)
-    local Done = false
+-- stop flag is only seen one round after the game thread set it. The flag lives in a table (shared by reference).
+-- IMPORTANT (UE4SS c62ada0): errors raised by UE4SS's functions (TMap:Find on a missing key, calling an invalid UFunction
+-- object, ...) are C++ exceptions that pcall does NOT catch; they unwind to UE4SS, which logs "Error: ..." and drops the tick.
+-- Such a tick never reaches the line after pcall, which is how it is noticed: Running is still set on the next tick.
+-- MaxCrashes ticks lost that way end the loop (default 3), so one bad call can't repeat every tick for the whole session.
+local function Every(ms, fn, MaxCrashes)
+    local St = { Done = false, Running = false, Crashes = 0 }
     LoopAsync(ms, function()
-        if Done then return true end
+        if St.Done then return true end
         ExecuteInGameThread(function()
-            if Done then return end
+            if St.Done then return end
+            if St.Running then
+                St.Crashes = St.Crashes + 1
+                St.Running = false
+                Log("loop tick %d aborted by a native error (see the Error line above)", St.Crashes)
+                if St.Crashes >= (MaxCrashes or 3) then
+                    Log("loop stopped after %d aborted ticks", St.Crashes)
+                    St.Done = true
+                    return
+                end
+            end
+            St.Running = true
             local Ok, Res = pcall(fn)
+            St.Running = false
             if not Ok then
                 Log("error: %s", tostring(Res))
-                Done = true
+                St.Done = true
             elseif Res then
-                Done = true
+                St.Done = true
             end
         end)
         return false
     end)
+end
+
+-- Log each distinct message once (for failures that would otherwise repeat every tick)
+local LoggedOnce = {}
+local function LogOnce(Key, fmt, ...)
+    if LoggedOnce[Key] then return end
+    LoggedOnce[Key] = true
+    Log(fmt, ...)
+end
+
+-- Calling a UFunction by name. UE4SS (c62ada0) answers obj[Name] with a UFunction userdata (callable), or with an invalid
+-- UObject userdata when the class has no such function; older builds return a Lua function. Returns Found, Ok, Result.
+local function FindUF(O, Name)
+    local Ok, F = pcall(function() return O[Name] end)
+    if not Ok or F == nil then return nil end
+    if type(F) == "function" then return F end
+    if type(F) == "userdata" then
+        local Ok2, V = pcall(function() return F:IsValid() end)
+        if Ok2 and V == true then return F end
+    end
+    return nil
+end
+
+local function CallUF(O, Name, ...)
+    local F = FindUF(O, Name)
+    if not F then return false, false, nil end
+    local Args = { ... }
+    local Ok, Res = pcall(function() return F(O, (table.unpack or unpack)(Args)) end)
+    return true, Ok, Res
+end
+
+-- Same UObject? (UE4SS hands out a fresh Lua wrapper per access, so == on wrappers is not an identity test)
+local function SameObj(A, B)
+    if A == nil or B == nil then return false end
+    local Ok, R = pcall(function() return A:IsValid() and B:IsValid() and A:GetAddress() == B:GetAddress() end)
+    return Ok and R == true
 end
 
 local function Vec(v) return { X = v.X, Y = v.Y, Z = v.Z } end
@@ -141,14 +197,35 @@ end
 ---------------------------------------------------------------------------------------------------------------------
 -- Re-entry memory: { map name -> last exit id }, one "name<TAB>id" line each, in a small file next to this script.
 ---------------------------------------------------------------------------------------------------------------------
+-- Where this script lives. debug.getinfo's source can be relative or empty under UE4SS (the first c62ada0 runs never found
+-- the loot manifest next to main.lua), so also ask package.searchpath where config.lua was found.
+local ScriptDirCache = nil
 local function ScriptDir()
+    if ScriptDirCache then return ScriptDirCache end
+    local Cands = {}
     local Ok, Info = pcall(debug.getinfo, 1, "S")
     if Ok and Info and type(Info.source) == "string" then
         local Src = (Info.source:gsub("^@", ""))
         local Dir = Src:match("^(.*[/\\])")
-        if Dir then return Dir end
+        if Dir then table.insert(Cands, Dir) end
     end
-    return ""
+    local Ok2, Found = pcall(function() return package.searchpath("config", package.path) end)
+    if Ok2 and type(Found) == "string" then
+        local Dir = Found:match("^(.*[/\\])")
+        if Dir then table.insert(Cands, Dir) end
+    end
+    table.insert(Cands, "ue4ss/Mods/ITRMapLoader/Scripts/")
+    table.insert(Cands, "Mods/ITRMapLoader/Scripts/")
+    for _, Dir in ipairs(Cands) do
+        local OkF, F = pcall(io.open, Dir .. "config.lua", "r")
+        if OkF and F then
+            F:close()
+            ScriptDirCache = Dir
+            return Dir
+        end
+    end
+    ScriptDirCache = Cands[1] or ""
+    return ScriptDirCache
 end
 
 local MemoryPath = Config.ReEntryFile or (ScriptDir() .. "reentry.txt")
@@ -261,6 +338,7 @@ local function ArmExits(M)
         local Ids = {}
         for _, E in ipairs(M.Exits) do table.insert(Ids, E.Id or "-") end
         Log("%d exit marker(s) (ids: %s)", #M.Exits, table.concat(Ids, ", "))
+        for _, E in ipairs(M.Exits) do Log("exit point %s at (%.0f, %.0f, %.0f)", E.Id or "-", E.X, E.Y, E.Z) end
     end
 end
 
@@ -281,23 +359,48 @@ end
 local function PawnLoc()
     local Pawn = UEHelpers.GetPlayer()
     if not Valid(Pawn) then return nil end
-    return Vec(Pawn:K2_GetActorLocation())
+    local Ok, L = pcall(function() return Vec(Pawn:K2_GetActorLocation()) end)
+    if not Ok then
+        LogOnce("pawnloc", "cannot read the pawn location: %s", tostring(L))
+        return nil
+    end
+    return L
 end
 
--- Is the player standing on this streamed level? true / false, or nil when the pawn can't tell (no movement base).
+-- Is the player standing on this streamed level? true / false, or nil when the pawn can't tell.
+-- Information only: Pawn:GetMovementBase() is not a UFunction (UE4SS c62ada0 returns an invalid object for it and every call
+-- raised "Tried calling a member function but the UObject instance is nullptr", ~2000x per run), so the base is read as the
+-- Character's BasedMovement.MovementBase property. It can be stale or empty for a VR pawn, so no decision depends on it;
+-- the staging/exit decisions use the pawn's position (StablePosition below). One log line on the first failure.
 local function OnMapGround(Stream)
     local Pawn = UEHelpers.GetPlayer()
     if not Valid(Pawn) or not Valid(Stream) then return nil end
-    local Ok, Base = pcall(function() return Pawn:GetMovementBase() end)
-    if not Ok or not Valid(Base) then return nil end
-    local Ok2, Same = pcall(function()
+    local Ok, Res = pcall(function()
+        local Base = Pawn.BasedMovement.MovementBase
+        if not Valid(Base) then return nil end
         local Owner = Base:GetOwner()
         local Level = Stream:GetLoadedLevel()
         if not Valid(Owner) or not Valid(Level) then return nil end
         return Owner:GetOuter():GetAddress() == Level:GetAddress()
     end)
-    if Ok2 then return Same end
-    return nil
+    if not Ok then
+        LogOnce("ground", "movement base unreadable (BasedMovement.MovementBase): %s; positions are used instead", tostring(Res))
+        return nil
+    end
+    return Res
+end
+
+-- The pawn has stayed within HRadius (horizontal) and VRadius (vertical) cm of Target for HoldMs of wall-clock time.
+-- State = a table the caller keeps between ticks. Returns true once stable, plus the current pawn location (may be nil).
+local function StablePosition(State, Target, HRadius, VRadius, HoldMs)
+    local L = PawnLoc()
+    if L and Dist2D(L, Target) <= HRadius and math.abs(L.Z - Target.Z) <= VRadius then
+        State.Since = State.Since or Now()
+        if Now() - State.Since >= HoldMs then return true, L end
+    else
+        State.Since = nil
+    end
+    return false, L
 end
 
 ---------------------------------------------------------------------------------------------------------------------
@@ -360,7 +463,7 @@ local function SetLightingScenariosHidden(World, Hide)
     if Hide then
         for _, S in ipairs(StreamingLevels(World)) do
             local L = S:GetLoadedLevel()
-            if S ~= (Current and Current.Stream) and Valid(L) and L.bIsLightingScenario and S:IsLevelVisible() then
+            if not SameObj(S, Current and Current.Stream) and Valid(L) and L.bIsLightingScenario and S:IsLevelVisible() then
                 S:SetShouldBeVisible(false)
                 table.insert(HiddenScenarios, S)
                 Log("hid lighting scenario %s", PkgName(S))
@@ -377,12 +480,12 @@ end
 ---------------------------------------------------------------------------------------------------------------------
 -- Gameplay activation (port of aiMod Maps.cpp ActivateModMapGameplay, T-052 / research/level-activation.md; untested here)
 ---------------------------------------------------------------------------------------------------------------------
--- The map streams in after the Hub already fired its level-start events, so the map's own gameplay actors (loot points,
+-- The map streams in after the Hub already fired its level-start events, so the map's gameplay actors (loot points,
 -- stashes, anomalies, spawners, generators; all APRBasicActor) never get them. We call the same UFUNCTIONs on each actor
 -- that lives in our level, in the game's order, through the actor so Blueprint overrides run. The global
 -- UEventsManager delegates are NOT fired (the game mode, the player and the UI listen to those too).
 local ActivateDelayMs = 3000                 -- after arrival: the actors' BeginPlay must have run
-local LootBaseClass = "BP_LootSpawnPoint_C"  -- GenerateLoot + SpawnLoot are called on this class and its children
+local LootBaseClass = "BP_LootSpawnPoint_C"  -- GenerateLoot is called on this class and its children
 
 local function ClassNameOf(A)
     local Ok, N = pcall(function() return A:GetClass():GetFName():ToString() end)
@@ -416,7 +519,7 @@ local function CurrentLevelTagName()
 end
 
 -- ---- loot manifest (T-051; port of aiMod Loot.cpp LootRegisterManifest) ------------------------------------------------
--- The map's own loot tags go into the game config's LootArray (TMap<FGameplayTag, FPRLootTableConfig>) before its loot is
+-- The map's loot tags go into the game config's LootArray (TMap<FGameplayTag, FPRLootTableConfig>) before its loot is
 -- generated, so its nodes never draw on the save-wide budgets of the real zone tags. aiMod drives the TMap's memory by hand;
 -- here it is TMap:Add through UE4SS. Manifest = tools/itr-showcase/loot_manifest.json (copied next to this script as
 -- "<Map.Name>.loot.json"); a "<Map.Name>.loot.lua" returning the same table also works, or Map.LootManifest = path.
@@ -502,9 +605,9 @@ local function LoadLootManifest(Map)
     if Map.LootManifest then table.insert(Candidates, Map.LootManifest) end
     table.insert(Candidates, Dir .. Map.Name .. ".loot.json")
     table.insert(Candidates, Dir .. Map.Name .. ".loot.lua")
-    local Last = Candidates[1]
+    local Tried = {}
     for _, Path in ipairs(Candidates) do
-        Last = Path
+        table.insert(Tried, Path)
         if Path:sub(-5) == ".json" then
             local Ok, F = pcall(io.open, Path, "r")
             if Ok and F then
@@ -525,7 +628,7 @@ local function LoadLootManifest(Map)
             end
         end
     end
-    return nil, Last
+    return nil, table.concat(Tried, " | ")
 end
 
 local function TMapCount(M)
@@ -534,8 +637,10 @@ local function TMapCount(M)
     return Ok and N or -1
 end
 
--- The value struct of Key in the TMap, or nil
+-- The value struct of Key in the TMap, or nil. TMap:Find THROWS (natively, not catchable) on a missing key, so Contains first.
 local function TMapFind(M, Key)
+    local Okc, Has = pcall(function() return M:Contains(Key) end)
+    if not Okc or Has ~= true then return nil end
     local Ok, V = pcall(function() return M:Find(Key) end)
     if not Ok or V == nil then return nil end
     if type(V) == "userdata" then
@@ -560,14 +665,98 @@ local function LootHasTag(Tag)
     return M ~= nil and TMapFind(M, { TagName = FName(Tag) }) ~= nil
 end
 
+-- Loading the map pak's DataTable. c62ada0's global LoadAsset goes through the asset registry and found nothing for pak-only
+-- assets in the first run, so: (1) already loaded? (2) LoadAsset (3 results: object, found, loaded) (3) KismetSystemLibrary
+-- LoadAsset_Blocking with a soft-object struct, the route aiMod uses. The route that worked is logged once.
+local function LoadOwnTable(Path)
+    local function Try(Name, Fn)
+        local Ok, O = pcall(Fn)
+        if Ok and O ~= nil and type(O) == "userdata" then
+            local Ok2, V = pcall(function() return O:IsValid() end)
+            if Ok2 and V == true then
+                LogOnce("loadroute", "loot: custom tables load via %s", Name)
+                return O
+            end
+        end
+        return nil
+    end
+    return Try("StaticFindObject", function() return StaticFindObject(Path) end)
+        or Try("LoadAsset", function() local O = LoadAsset(Path); return O end)
+        or Try("KismetSystemLibrary.LoadAsset_Blocking", function()
+            local KSL = StaticFindObject("/Script/Engine.Default__KismetSystemLibrary")
+            return KSL:LoadAsset_Blocking({ AssetPathName = FName(Path), SubPathString = "" })
+        end)
+end
+
+-- T-092: the map's table holder. The showcase places one BP_ItrShowcase_LootTables actor whose "Tables" array hard-references every
+-- loot DataTable, so the tables load with the level and the GC keeps them while it is loaded (UE4SS Lua cannot AddToRoot).
+-- Returns { [DataTable name] = DataTable } and the count; empty for a map without a holder.
+local HolderClass = "BP_ItrShowcase_LootTables_C"
+local function HeldTables()
+    local Out, N = {}, 0
+    local Ok, All = pcall(FindAllOf, HolderClass)
+    if not Ok or not All then return Out, 0 end
+    for _, H in ipairs(All) do
+        if Valid(H) then
+            pcall(function()
+                H.Tables:ForEach(function(_, Elem)
+                    local T = Elem:get()
+                    if Valid(T) then
+                        Out[T:GetFName():ToString()] = T
+                        N = N + 1
+                    end
+                end)
+            end)
+        end
+    end
+    return Out, N
+end
+
 local LootRegisteredOnce = false
+local KeepAlive = {}    -- Lua-side references to our DataTables (not GC roots; see RegisterLootTags)
+local LootManifestUsed = nil  -- the manifest of the registration (re-pointing / clearing the map's entries on later loads / unload)
 
 -- Called before the activation pass, once per session. For each manifest tag not already in LootArray: copy the donor
--- (source_tag) entry's table, set LootPoints, TMap:Add. Own DataTable (table_asset) if the map pak ships it, else the donor's
+-- (source_tag) entry's table, set LootPoints, TMap:Add. The map's DataTable (table_asset) if the map pak includes it, else the donor's
 -- (used points are then SHARED with the donor zone, as in aiMod).
+-- Progress survives a native error (not catchable by pcall) in the middle of the tag list: the step is re-run and resumes after the
+-- tag that was being processed, so one bad tag is skipped instead of repeating forever or losing the rest.
+local RegState = { I = 0, Added = 0, Skipped = 0, NoDonor = 0, Failed = 0, Own = 0, Before = nil }
+-- T-092: the map's entries point at tables that live only while the map is loaded. Each later load re-points them at the tables the new
+-- level's holder brought in (ToDonor = false), each unload points them back at the donor's vanilla table (ToDonor = true), so LootArray
+-- never keeps a pointer to a collected table.
+local function RepointOwnTables(ToDonor)
+    local Manifest = LootManifestUsed
+    local M = LootArrayOf()
+    if not Manifest or type(Manifest.tags) ~= "table" or not M then return 0 end
+    local Held, HeldN = {}, 0
+    if not ToDonor then Held, HeldN = HeldTables() end
+    local N, Missing = 0, 0
+    for _, T in ipairs(Manifest.tags) do
+        if type(T.tag) == "string" and type(T.table_name) == "string" and T.table_asset and T.table_asset ~= "" then
+            local Back = TMapFind(M, { TagName = FName(T.tag) })
+            local New = nil
+            if ToDonor then
+                local Donor = type(T.source_tag) == "string" and TMapFind(M, { TagName = FName(T.source_tag) }) or nil
+                if Donor then pcall(function() New = Donor.LootTable end) end
+            else
+                New = Held[T.table_name]
+            end
+            if Back ~= nil and New ~= nil then
+                if pcall(function() Back.LootTable = New end) then N = N + 1 end
+            else
+                Missing = Missing + 1
+            end
+        end
+    end
+    Log("loot: own entries %s: %d re-pointed, %d without a table%s", ToDonor and "back to the donor tables (map unloaded)" or "to the map's held tables",
+        N, Missing, ToDonor and "" or string.format(" (holder: %d table(s))", HeldN))
+    return N
+end
+
 local function RegisterLootTags(Manifest)
     if not Manifest then return 0 end
-    if LootRegisteredOnce then return 0 end
+    if LootRegisteredOnce then return RepointOwnTables(false) end
     local Tags = Manifest.tags
     if type(Tags) ~= "table" then
         Log("loot manifest: no tags array")
@@ -578,54 +767,93 @@ local function RegisterLootTags(Manifest)
         Log("loot manifest: GameConfig / LootArray not available yet; nothing registered")
         return 0
     end
-    local Before = TMapCount(M)
-    Log("loot manifest: %d tag(s); LootArray has %d entries before", #Tags, Before)
-    local Added, Skipped, NoDonor, Failed, Own = 0, 0, 0, 0, 0
-    for _, T in ipairs(Tags) do
+    local R = RegState
+    R.Held, R.HeldN = HeldTables()
+    if not R.Before then
+        R.Before = TMapCount(M)
+        Log("loot manifest: %d tag(s); LootArray has %d entries before", #Tags, R.Before)
+    else
+        Log("loot manifest: resuming after tag #%d (the previous attempt was aborted by a native error)", R.I)
+    end
+    for I = R.I + 1, #Tags do
+        R.I = I
+        local T = Tags[I]
         local Tag, Src, Points = T.tag, T.source_tag, math.floor(tonumber(T.loot_points) or 0)
         if type(Tag) == "string" and Tag ~= "" then
             local Key = { TagName = FName(Tag) }
             if TMapFind(M, Key) ~= nil then
-                Skipped = Skipped + 1
+                R.Skipped = R.Skipped + 1
                 Log("loot: tag %s already in LootArray: skipped", Tag)
             else
                 local Donor = type(Src) == "string" and TMapFind(M, { TagName = FName(Src) }) or nil
                 if Donor == nil then
-                    NoDonor = NoDonor + 1
+                    R.NoDonor = R.NoDonor + 1
                     Log("loot: tag %s: source tag %s not in LootArray (no donor DataTable): skipped", Tag, tostring(Src))
                 else
                     local Table = Donor.LootTable
                     local OwnTable = nil
                     if type(T.table_asset) == "string" and T.table_asset ~= "" then
-                        local Ok, O = pcall(function()
-                            if LoadAsset then pcall(LoadAsset, T.table_asset) end
-                            return StaticFindObject(T.table_asset)
-                        end)
-                        if Ok and Valid(O) then OwnTable = O end
+                        OwnTable = R.Held[T.table_name or ""]
+                        if OwnTable then
+                            LogOnce("held", "loot: custom tables come from the map's table holder (%d table(s))", R.HeldN)
+                        else
+                            OwnTable = LoadOwnTable(T.table_asset)
+                            if OwnTable then
+                                Log("loot: tag %s: table %s is NOT held by the map (no %s actor): nothing keeps it alive in Lua", Tag,
+                                    tostring(T.table_asset), HolderClass)
+                            end
+                        end
                     end
                     if OwnTable then
                         Table = OwnTable
-                        Own = Own + 1
+                        R.Own = R.Own + 1
                         Log("loot: tag %s: own DataTable %s (isolated used points)", Tag, T.table_asset)
                     else
                         Log("loot: tag %s: no own DataTable asset (%s); using the donor's: its used points are SHARED with the zone tag %s",
                             Tag, tostring(T.table_asset), tostring(Src))
                     end
+                    Log("loot: tag %s: adding (budget %d)", Tag, Points)
                     local Ok, Err = pcall(function()
                         M:Add(Key, { Conditions = {}, LootPoints = Points, LootTable = Table, ExcludeGeneration = false })
                     end)
                     if not Ok then
-                        Failed = Failed + 1
+                        R.Failed = R.Failed + 1
                         Log("loot: tag %s: TMap:Add failed: %s", Tag, tostring(Err))
                     else
                         local Back = TMapFind(M, Key)
                         if Back ~= nil then
-                            Added = Added + 1
+                            -- c62ada0's TMap:Add stored a zeroed value (read back: budget 0), so write the fields into the stored
+                            -- struct in place (Find hands out a reference to the map's storage)
+                            local PtsNow = -1
+                            pcall(function() PtsNow = Back.LootPoints end)
+                            if PtsNow ~= Points then
+                                local OkW, ErrW = pcall(function()
+                                    Back.LootPoints = Points
+                                    Back.LootTable = Table
+                                    Back.ExcludeGeneration = false
+                                end)
+                                pcall(function() PtsNow = Back.LootPoints end)
+                                LogOnce("inplace", "loot: Add stored the struct without its fields; wrote LootPoints/LootTable in place: %s (LootPoints now %s)",
+                                    OkW and "ok" or tostring(ErrW), tostring(PtsNow))
+                            end
+                            R.Added = R.Added + 1
                             local Pts = -1
                             pcall(function() Pts = Back.LootPoints end)
                             Log("loot: tag %s added: budget %s (wanted %d), donor %s", Tag, tostring(Pts), Points, tostring(Src))
+                            if OwnTable then
+                                -- UE4SS Lua has no AddToRoot / SetFlags (only HasAnyFlags / HasAnyInternalFlags), so the map's
+                                -- DataTable is kept alive the only way Lua can: by the UPROPERTY reference in GameConfig.LootArray
+                                -- (a TMap<FGameplayTag, FPRLootTableConfig> on a live data asset is traversed by the GC). Pin the
+                                -- Lua wrapper too, and log the root-set bit (EInternalObjectFlags::RootSet = 1<<30) once per table.
+                                KeepAlive[Tag] = OwnTable
+                                local Ok3, Root = pcall(function() return OwnTable:HasAnyInternalFlags(0x40000000) end)
+                                local Ok4, TblBack = pcall(function() return Back.LootTable end)
+                                Log("loot: tag %s: custom table %s RootSet flag %s; referenced from LootArray: %s", Tag,
+                                    ClassNameOf(OwnTable) .. " " .. tostring(T.table_asset), Ok3 and tostring(Root) or "unreadable",
+                                    (Ok4 and Valid(TblBack)) and "yes (GC-reachable)" or "no")
+                            end
                         else
-                            Failed = Failed + 1
+                            R.Failed = R.Failed + 1
                             Log("loot: tag %s: TMap:Add returned but Find does not see it", Tag)
                         end
                     end
@@ -633,10 +861,11 @@ local function RegisterLootTags(Manifest)
             end
         end
     end
-    LootRegisteredOnce = Added + Skipped > 0
-    Log("loot manifest registered: LootArray %d -> %d entries (%d added, %d already present, %d without donor, %d failed, %d own tables)",
-        Before, TMapCount(M), Added, Skipped, NoDonor, Failed, Own)
-    return Added
+    LootRegisteredOnce = true
+    LootManifestUsed = Manifest
+    Log("loot manifest registered: LootArray %d -> %d entries (%d added, %d already present, %d without donor, %d failed, %d custom tables)",
+        R.Before, TMapCount(M), R.Added, R.Skipped, R.NoDonor, R.Failed, R.Own)
+    return R.Added
 end
 
 -- TEMP shim (config LootRetagShim; mirrors aiMod Loot.cpp LootTempRetagG2): until the map pipeline emits the showcase tags,
@@ -708,29 +937,37 @@ local function SortedKeys(T)
 end
 
 -- One pass: call Fn(Args) on every actor in Acts that passes Filter and is still valid, logging each call.
-local function ActivationPass(Acts, Fn, Args, Filter)
-    local C = { Ok = 0, NoFunc = 0, Failed = 0, Dead = 0 }
-    for _, A in ipairs(Acts) do
+-- One pass: call Fn(Args) on every actor in Acts that passes Filter and is still valid. St = {I, C} lives in the caller's context:
+-- a native error in a call (not catchable by pcall) aborts the step, the step is re-run and resumes after that actor.
+local function ActivationPass(Acts, Fn, Args, Filter, St)
+    St.I = St.I or 0
+    St.C = St.C or { Ok = 0, NoFunc = 0, Failed = 0, Dead = 0 }
+    local C = St.C
+    if St.I > 0 then Log("activate: %s: resuming after actor #%d (aborted by a native error)", Fn, St.I) end
+    while St.I < #Acts do
+        St.I = St.I + 1
+        local A = Acts[St.I]
         if not Filter or Filter(A) then
             if not Valid(A) then
                 C.Dead = C.Dead + 1
             else
                 local Name = A:GetFName():ToString()
                 local Cls = ClassNameOf(A)
-                local Okf, F = pcall(function() return A[Fn] end)
-                if not Okf or type(F) ~= "function" then
+                C.Failed = C.Failed + 1                -- counted as failed until the call returns (undone below)
+                local Found, Ok, Res = CallUF(A, Fn, (table.unpack or unpack)(Args or {}))
+                C.Failed = C.Failed - 1
+                if not Found then
                     C.NoFunc = C.NoFunc + 1
-                    Log("activate: %s -> %s (%s): NO SUCH FUNCTION", Fn, Name, Cls)
-                else
-                    local Ok, Res = pcall(F, A, (table.unpack or unpack)(Args or {}))
-                    if Ok then
-                        C.Ok = C.Ok + 1
+                    if C.NoFunc <= 10 then Log("activate: %s -> %s (%s): NO SUCH FUNCTION", Fn, Name, Cls) end
+                elseif Ok then
+                    C.Ok = C.Ok + 1
+                    if C.Ok <= 25 or not Valid(A) or Name:sub(1, 3) == "G2_" then
                         Log("activate: %s -> %s (%s): called%s%s", Fn, Name, Cls, Res ~= nil and (" = " .. tostring(Res)) or "",
                             Valid(A) and "" or "; actor DESTROYED itself")
-                    else
-                        C.Failed = C.Failed + 1
-                        Log("activate: %s -> %s (%s): ERROR %s", Fn, Name, Cls, tostring(Res))
                     end
+                else
+                    C.Failed = C.Failed + 1
+                    if C.Failed <= 10 then Log("activate: %s -> %s (%s): ERROR %s", Fn, Name, Cls, tostring(Res)) end
                 end
             end
         end
@@ -739,48 +976,92 @@ local function ActivationPass(Acts, Fn, Args, Filter)
     return C
 end
 
-local function ActivateGameplay(Map, Stream)
-    local T0 = os.clock()
-    if not Valid(Stream) or not CallBool(Stream, "IsLevelVisible") then
-        Log("activate: skipped (map gone)")
-        return
+local function ActivationSteps(Map, Stream, Ctx)
+    local function Alive()
+        if Valid(Stream) and CallBool(Stream, "IsLevelVisible") then return true end
+        Log("activate: step skipped (map gone)")
+        return false
     end
-    local TagName = CurrentLevelTagName()
-    local Tag = { TagName = FName(TagName) }
-    local Acts = BasicActorsIn(Stream)
-    local Before = CountByClass(Acts)
-    Log("activate: %d APRBasicActor(s) in %s; level tag %s", #Acts, Map.Level, TagName)
-    for _, N in ipairs(SortedKeys(Before)) do Log("activate:   %s x %d", N, Before[N]) end
-
-    local Manifest, ManifestPath = LoadLootManifest(Map)
-    if Manifest then Log("activate: loot manifest %s", ManifestPath)
-    else Log("activate: no loot manifest (%s); the map's loot uses the tags it was built with", ManifestPath) end
-    local Ok, Err = pcall(RegisterLootTags, Manifest)
-    if not Ok then Log("activate: RegisterLootTags failed: %s", tostring(Err)) end
-    if Opt(Map, "LootRetagShim", false) then
-        local Ok2, Err2 = pcall(LootRetagShim, Acts)
-        if not Ok2 then Log("activate: LootRetagShim failed: %s", tostring(Err2)) end
-    end
-
-    -- Order of the game's own chain (level-activation.md section 3). An actor that destroys itself in OnLevelPrepare
-    -- (generator excluded in the save) is skipped by the later passes through the Valid check.
     local function IsLoot(A) return IsClassNamed(A, LootBaseClass) end
-    local Prep = ActivationPass(Acts, "OnLevelPrepare", { Tag })
-    local Gen = ActivationPass(Acts, "GenerateLoot", nil, IsLoot)
-    local Spawn = ActivationPass(Acts, "SpawnLoot", nil, IsLoot)
-    local Start = ActivationPass(Acts, "OnLevelStarted", { Tag })
-    local Game = ActivationPass(Acts, "OnGameStarted")
-    local Trans = ActivationPass(Acts, "OnTransitionEnd")
-
-    local After = CountByClass(Acts)
-    Log("activate: summary per class (before -> alive after):")
-    for _, N in ipairs(SortedKeys(Before)) do
-        Log("activate:   %s: %d -> %d%s", N, Before[N], After[N] or 0, (After[N] or 0) < Before[N] and "  (destroyed itself)" or "")
+    -- T-092: the native APRLootSpawner::OnLevelPrepare arms a distance timer that calls SpawnLoot once the player is within
+    -- GameConfig.LootSpawnDistance; calling SpawnLoot here as well spawned every item twice (VR round 3). So: OnLevelPrepare +
+    -- GenerateLoot only, and no OnLevelPrepare for a node that already spawned (saved items from an earlier visit), which would re-arm it.
+    local function NotPreSpawned(A)
+        local Ok, Addr = pcall(function() return A:GetAddress() end)
+        return not (Ok and Ctx.PreSpawned and Ctx.PreSpawned[Addr])
     end
-    Log("activate: done in %.0f ms; level tag %s; basic actors %d; OnLevelPrepare %d, GenerateLoot %d, SpawnLoot %d, "
-        .. "OnLevelStarted %d, OnGameStarted %d, OnTransitionEnd %d; errors %d", (os.clock() - T0) * 1000, TagName, #Acts, Prep.Ok,
-        Gen.Ok, Spawn.Ok, Start.Ok, Game.Ok, Trans.Ok,
-        Prep.Failed + Gen.Failed + Spawn.Failed + Start.Failed + Game.Failed + Trans.Failed)
+    local function PassStep(Key, Fn, Args, Filter)
+        return { Pass = true, Run = function()
+            if not Alive() then Ctx[Key] = Ctx[Key] or { Ok = 0, Failed = 0 }; return end
+            local St = Ctx[Key .. "St"]
+            if not St then St = {}; Ctx[Key .. "St"] = St end
+            St.C = St.C or { Ok = 0, NoFunc = 0, Failed = 0, Dead = 0 }
+            Ctx[Key] = St.C
+            ActivationPass(Ctx.Acts, Fn, Args and Args(Ctx) or nil, Filter, St)
+        end }
+    end
+    local function TagArgs(C) return { C.Tag } end
+    return {
+        { Run = function()
+            Ctx.T0 = os.clock()
+            if not Alive() then return end
+            Ctx.TagName = CurrentLevelTagName()
+            Ctx.Tag = { TagName = FName(Ctx.TagName) }
+            Ctx.Acts = BasicActorsIn(Stream)
+            local Before = CountByClass(Ctx.Acts)
+            Ctx.Before = Before
+            Log("activate: %d APRBasicActor(s) in %s; level tag %s", #Ctx.Acts, Map.Level, Ctx.TagName)
+            for _, N in ipairs(SortedKeys(Before)) do Log("activate:   %s x %d", N, Before[N]) end
+            Ctx.PreSpawned, Ctx.PreSpawnedN = {}, 0
+            for _, A in ipairs(Ctx.Acts) do
+                if Valid(A) and IsLoot(A) then
+                    local Ok, N = pcall(function() return A.SpawnedItems:GetArrayNum() end)
+                    if Ok and (N or 0) > 0 then
+                        Ctx.PreSpawned[A:GetAddress()] = true
+                        Ctx.PreSpawnedN = Ctx.PreSpawnedN + 1
+                    end
+                end
+            end
+            Log("activate: %d loot node(s) already spawned their items (no OnLevelPrepare for them)", Ctx.PreSpawnedN)
+            local Manifest, ManifestPath = LoadLootManifest(Map)
+            if Manifest then Log("activate: loot manifest %s", ManifestPath)
+            else Log("activate: no loot manifest (tried %s)", ManifestPath) end
+            Ctx.Step1Done = true
+        end },
+        { Pass = true, Run = function()
+            -- loot tags: TMap:Add into GameConfig.LootArray (a native error here only loses this step)
+            if not Alive() then return end
+            local Manifest = LoadLootManifest(Map)
+            local Ok, Err = pcall(RegisterLootTags, Manifest)
+            if not Ok then Log("activate: RegisterLootTags failed: %s", tostring(Err)) end
+            if Opt(Map, "LootRetagShim", false) then
+                local Ok2, Err2 = pcall(LootRetagShim, Ctx.Acts)
+                if not Ok2 then Log("activate: LootRetagShim failed: %s", tostring(Err2)) end
+            end
+        end },
+        -- Order of the game's chain (level-activation.md section 3). An actor that destroys itself in OnLevelPrepare
+        -- (generator excluded in the save) is skipped by the later passes through the Valid check.
+        PassStep("Prep", "OnLevelPrepare", TagArgs, NotPreSpawned),
+        PassStep("Gen", "GenerateLoot", nil, IsLoot),
+        -- (no SpawnLoot pass: the native distance check spawns each node's items once, T-092)
+        PassStep("Start", "OnLevelStarted", TagArgs),
+        PassStep("Game", "OnGameStarted"),
+        PassStep("Trans", "OnTransitionEnd"),
+        { Run = function()
+            local Acts = Ctx.Acts or {}
+            local After = CountByClass(Acts)
+            Log("activate: summary per class (before -> alive after):")
+            for _, N in ipairs(SortedKeys(Ctx.Before or {})) do
+                Log("activate:   %s: %d -> %d%s", N, Ctx.Before[N], After[N] or 0, (After[N] or 0) < Ctx.Before[N] and "  (destroyed itself)" or "")
+            end
+            local Z = { Ok = 0, Failed = 0 }
+            local P, G, S, St, Gm, T = Ctx.Prep or Z, Ctx.Gen or Z, Ctx.Spawn or Z, Ctx.Start or Z, Ctx.Game or Z, Ctx.Trans or Z
+            Log("activate: done in %.0f ms; level tag %s; basic actors %d; OnLevelPrepare %d, GenerateLoot %d, SpawnLoot %d (native), "
+                .. "OnLevelStarted %d, OnGameStarted %d, OnTransitionEnd %d; errors %d", (os.clock() - (Ctx.T0 or os.clock())) * 1000,
+                Ctx.TagName or "?", #Acts, P.Ok, G.Ok, S.Ok, St.Ok, Gm.Ok, T.Ok,
+                P.Failed + G.Failed + S.Failed + St.Failed + Gm.Failed + T.Failed)
+        end },
+    }
 end
 
 -- Once per load: ActivateDelayMs after the player is settled, if this load is still the current one and still visible
@@ -792,17 +1073,28 @@ local function ScheduleActivation(Map)
     if not Current or Current.Activated then return end
     Current.Activated = true
     local Stream = Current.Stream
-    local Waited = 0
+    local T0w = Now()
+    local Ctx, Steps = { Next = 0, Tries = {} }, nil
     Every(250, function()
-        if not Current or Current.Stream ~= Stream or not Valid(Stream) then
+        if not Current or not SameObj(Current.Stream, Stream) or not Valid(Stream) then
             Log("activate: skipped (map unloaded or another load started)")
             return true
         end
-        Waited = Waited + 250
-        if Waited < ActivateDelayMs then return false end
-        ActivateGameplay(Map, Stream)
-        return true
-    end)
+        if Now() - T0w < ActivateDelayMs then return false end
+        Steps = Steps or ActivationSteps(Map, Stream, Ctx)
+        local I = Ctx.Next + 1
+        if I > #Steps then return true end
+        -- a step that was aborted by a native error is re-run (passes resume where they stopped); the others get 2 attempts
+        Ctx.Tries[I] = (Ctx.Tries[I] or 0) + 1
+        if Ctx.Tries[I] > (Steps[I].Pass and 300 or 2) then
+            Log("activate: step %d given up after %d attempts", I, Ctx.Tries[I] - 1)
+            Ctx.Next = I
+            return Ctx.Next >= #Steps
+        end
+        Steps[I].Run()
+        Ctx.Next = I
+        return I >= #Steps
+    end, 400)
 end
 
 ---------------------------------------------------------------------------------------------------------------------
@@ -811,10 +1103,11 @@ end
 -- Watches whether the player stays at the arrival point after the teardown (the Hub's snap-back shows up here)
 local function StayCheck(Arrive)
     local At = { 1, 3, 6, 10, 20 }
+    local T0w = Now()
     local Step, Elapsed = 1, 0
     Every(500, function()
         if not Current or Current.Phase ~= "active" then return true end
-        Elapsed = Elapsed + 500
+        Elapsed = math.floor(Now() - T0w)
         if Elapsed < At[Step] * 1000 then return false end
         local L = PawnLoc()
         if L then
@@ -874,7 +1167,7 @@ local function UnloadHub(Map, M, Arrival, Staging)
     local Levels = {}
     local Idle = 0
     for _, S in ipairs(StreamingLevels(World)) do
-        if S ~= Current.Stream then
+        if not SameObj(S, Current.Stream) then
             if not StreamActive(S) then
                 Idle = Idle + 1
             else
@@ -913,10 +1206,11 @@ local function UnloadHub(Map, M, Arrival, Staging)
     Current.TornDown = true
     Log("Hub teardown: %d level(s) unloading, %d kept, %d streaming level(s) already idle", Count, #Levels - Count, Idle)
     Current.Phase = "tearing"
+    local T0w = Now()
     local Waited = 0
     Every(250, function()
         if not Current or not Valid(Current.Stream) then return true end
-        Waited = Waited + 250
+        Waited = math.floor(Now() - T0w)
         local Left = 0
         for _, H in ipairs(Levels) do
             if not H.Kept and not H.Gone then
@@ -925,6 +1219,19 @@ local function UnloadHub(Map, M, Arrival, Staging)
                     Log("Hub teardown: %s unloaded after %d ms", H.Name, Waited)
                 else
                     Left = Left + 1
+                end
+            end
+        end
+        -- loaded but hidden and not requested for 5 s (L_Transition after a -nohmd start): an unload that never completes. A level
+        -- that is not visible has no collision and runs nothing, so it cannot hold or move the player: counted as gone (as aiMod).
+        if Left > 0 and Waited > 5000 then
+            for _, H in ipairs(Levels) do
+                if not H.Kept and not H.Gone and Valid(H.S) and not CallBool(H.S, "IsLevelVisible")
+                    and not PropBool(H.S, "bShouldBeLoaded") and not PropBool(H.S, "bShouldBeVisible") then
+                    H.Gone = true
+                    Left = Left - 1
+                    Log("Hub teardown: %s is loaded but hidden and not requested after %d ms (%s); counted as gone", H.Name, Waited,
+                        StreamBitsText(H.S))
                 end
             end
         end
@@ -938,7 +1245,7 @@ local function UnloadHub(Map, M, Arrival, Staging)
         local Ground = OnMapGround(Current.Stream)
         Log("Hub teardown done after %d ms: %d unloaded, %d left; player at %s, on map ground: %s", Waited,
             Count - Left, Left, L and FmtV(L) or "?", tostring(Ground))
-        if Left > 0 or Ground == false then
+        if Left > 0 then
             Log("Hub teardown: NOT moving to the arrival marker (%d Hub level(s) did not unload, on map ground: %s); "
                 .. "the player stays at the staging point", Left, tostring(Ground))
             ArmExits(M)
@@ -966,29 +1273,28 @@ local function Teardown(Map, M)
     Log("Hub teardown: staging point %s (%.0f m from the start marker)", FmtV(Staging.Loc), StageD / 100)
     Current.Phase = "staging"
     TeleportPlayer(Staging.Loc, Staging.Rot, "staging point")
-    local Waited, Near = 0, 0
+    local T0w = Now()
+    local Waited, Stable, Logged = 0, {}, 0
     Every(250, function()
         if not Current or not Valid(Current.Stream) then return true end
-        Waited = Waited + 250
-        local Ground = OnMapGround(Current.Stream)
-        local L = PawnLoc()
-        local Confirmed
-        if Ground ~= nil then
-            Confirmed = Ground
-        else
-            -- the pawn can't report its floor: counts as standing on the map after a second at the staging point
-            if L and Dist2D(L, Staging.Loc) < 400 then Near = Near + 1 else Near = 0 end
-            Confirmed = Near >= 4
-        end
+        Waited = math.floor(Now() - T0w)
+        -- Standing on the map = the pawn has held still at the staging point for 1.5 s (the Hub is far away from it, so the
+        -- only ground there is the map's; a snap-back to the Hub would move the pawn). The movement base is logged for info.
+        local Confirmed, L = StablePosition(Stable, Staging.Loc, 400, 1000, 1500)
         if Confirmed then
-            Log("Hub teardown +%d ms: player at %s on map ground (%s); unloading the Hub", Waited, L and FmtV(L) or "?",
-                Ground ~= nil and "movement base" or "position")
+            local Ground = OnMapGround(Current.Stream)
+            Log("Hub teardown +%d ms: player at %s held the staging point 1.5 s (movement base on map: %s); unloading the Hub",
+                Waited, L and FmtV(L) or "?", tostring(Ground))
             UnloadHub(Map, M, Arrival, Staging)
             return true
         end
+        if Waited >= 2000 * (Logged + 1) and Logged < 7 then
+            Logged = Logged + 1
+            Log("Hub teardown: waiting %d ms; player at %s, %s from the staging point", Waited, L and FmtV(L) or "?",
+                L and string.format("%.0f cm", Dist3D(L, Staging.Loc)) or "?")
+        end
         if Waited >= 15000 then
-            Log("Hub teardown skipped: the player was not on the map's ground at the staging point within 15 s (on map: %s)",
-                tostring(Ground))
+            Log("Hub teardown skipped: the player did not hold the staging point within 15 s (player at %s)", L and FmtV(L) or "?")
             if Map.HideLightingScenario then SetLightingScenariosHidden(UEHelpers.GetWorld(), true) end
             Arrive(Map, M, Arrival)
             return true
@@ -1001,6 +1307,7 @@ end
 -- Leaving
 ---------------------------------------------------------------------------------------------------------------------
 local function FinishUnload()
+    pcall(RepointOwnTables, true)   -- T-092: the map's tables go with the level
     local World = UEHelpers.GetWorld()
     if Current and Valid(Current.Stream) then
         Current.Stream:SetShouldBeVisible(false)
@@ -1012,25 +1319,26 @@ local function FinishUnload()
 end
 
 -- Player must stand off the map before it goes away. Return = where they stood in the Hub (may be nil).
+-- With a Return position: off the map = within 6 m of it for 2 ticks (the Hub is far from the map). Without one: the
+-- movement base decides when it can tell, else there is nothing to wait for.
 local function ConfirmOffMapThenUnload(Return)
+    local T0w = Now()
     local Waited, Near = 0, 0
     local Stream = Current.Stream
     Every(250, function()
         if not Current then return true end
-        Waited = Waited + 250
-        local Ground = OnMapGround(Stream)
-        local Off
-        if Ground ~= nil then
-            Off = not Ground
-        elseif Return then
+        Waited = math.floor(Now() - T0w)
+        local Off, How
+        if Return then
             local L = PawnLoc()
             if L and Dist2D(L, Return) < 600 then Near = Near + 1 else Near = 0 end
-            Off = Near >= 2
+            Off, How = Near >= 2, "position"
         else
-            Off = true                           -- nothing to compare with: nothing to wait for
+            local Ground = OnMapGround(Stream)
+            Off, How = (Ground ~= true), (Ground ~= nil and "movement base" or "nothing to compare with")
         end
         if Off then
-            Log("exit: player is off the map (%s); unloading it", Ground ~= nil and "movement base" or "position")
+            Log("exit: player is off the map (%s); unloading it", How)
             FinishUnload()
             return true
         end
@@ -1080,37 +1388,74 @@ local function HubExitFinish(Start, Return)
     local MapLoaded = Valid(Current.Stream) and StreamActive(Current.Stream)
     Log("exit: Hub ready; the native Hub load left the map loaded: %s; player at %s, moved %.0f m since the exit began (%s)",
         tostring(MapLoaded), L and FmtV(L) or "?", Moved / 100, Moved > 5000 and "the game placed them" or "the game did not move them")
-    RestoreHubLevels()
-    if Moved <= 5000 and Return then
-        Log("exit: teleporting the player back to their Hub position %s", FmtV(Return.Loc))
-        TeleportPlayer(Return.Loc, Return.Rot, "saved Hub position")
-        ConfirmOffMapThenUnload(Return.Loc)
-    else
-        ConfirmOffMapThenUnload(nil)
+    -- The game brings the Hub's sublevels back one after the other after the main Hub level turned visible (the first run judged
+    -- them at that moment and called 8 of 11 "not brought back", though all 9 were back a few seconds later): wait up to 20 s
+    -- for the ones it had loaded before, then judge.
+    local T0w = Now()
+    local Ctx = { Judged = false }
+    local function Finish()
+        if Ctx.Judged then return end
+        Ctx.Judged = true
+        RestoreHubLevels()
+        if Moved <= 5000 and Return then
+            Log("exit: teleporting the player back to their Hub position %s", FmtV(Return.Loc))
+            TeleportPlayer(Return.Loc, Return.Rot, "saved Hub position")
+            ConfirmOffMapThenUnload(Return.Loc)
+        else
+            ConfirmOffMapThenUnload(nil)
+        end
     end
+    Every(500, function()
+        if not Current then return true end
+        local Missing = 0
+        for _, H in ipairs(Current.HubLevels or {}) do
+            if not H.Kept and Valid(H.S) and (H.WasLoaded or H.WasShouldLoad)
+                and not (CallBool(H.S, "IsLevelLoaded") or PropBool(H.S, "bShouldBeLoaded")) then
+                Missing = Missing + 1
+            end
+        end
+        if Missing > 0 and Now() - T0w < 20000 then return false end
+        Finish()
+        return true
+    end)
 end
 
--- Exit with the Hub torn down: the game's own Hub load while the player still stands on the map, then unload the map
+-- Exit with the Hub torn down: the game's Hub load while the player still stands on the map, then unload the map
 -- only if it is still loaded and the player isn't on it.
 local function HubExit()
     local Start = PawnLoc()
     local Return = Current.Return
     for _, H in ipairs(Current.HubLevels or {}) do H.Gone = nil end
     Log("exit: Hub teardown is active; asking the game to load %s while the player stands on the map", HubLevelTag)
-    local Called = CallLoadLevelHub()
-    local Transferred = false
-    if not Called then
-        Transferred = true
-        if not CallTransferHub() then
-            Log("exit FAILED: neither LoadLevel nor TransferToLevel could be called; the map stays loaded")
-            Current.Phase = "active"
-            return
-        end
-    end
+    local St = { LoadTried = false, Called = false, Transferred = false }
+    local T0w = Now()
     local Elapsed, Activity = 0, false
+    local Transferred = false
     Every(250, function()
         if not Current or Current.Phase ~= "exiting" then return true end
-        Elapsed = Elapsed + 250
+        Elapsed = math.floor(Now() - T0w)
+        -- The calls are made from inside the loop, one per tick, so a native error in LoadLevel (not catchable by pcall)
+        -- leaves the loop alive and the next tick falls back to TransferToLevel.
+        if not St.LoadTried then
+            St.LoadTried = true
+            St.Called = CallLoadLevelHub()
+            if not St.Called then
+                St.Transferred = true
+                if not CallTransferHub() then
+                    Log("exit FAILED: neither LoadLevel nor TransferToLevel could be called; the map stays loaded")
+                    Current.Phase = "active"
+                    return true
+                end
+            end
+            return false
+        end
+        if not St.Called and not St.Transferred then
+            Log("exit: LoadLevel did not return (native error); falling back to TransferToLevel")
+            St.Transferred = true
+            CallTransferHub()
+            return false
+        end
+        Transferred = St.Transferred
         local World = UEHelpers.GetWorld()
         if not Valid(World) then return false end
         local LM = GetLevelManager()
@@ -1127,6 +1472,7 @@ local function HubExit()
             Log("exit +%d ms: LoadLevel(%s) did nothing (the game probably believes it is still in the Hub); "
                 .. "falling back to TransferToLevel", Elapsed, HubLevelTag)
             Transferred = true
+            St.Transferred = true
             CallTransferHub()
         end
         if Elapsed > 120000 then
@@ -1212,10 +1558,11 @@ local function Load(Map)
     end
     Current = { Map = Map, Stream = Stream, Return = Return, Phase = "loading", Exits = {} }
     Log("streaming %s ...", Map.Level)
+    local T0w = Now()
     local Waited = 0
     Every(250, function()
-        if not Current or Current.Stream ~= Stream or not Valid(Stream) then return true end
-        Waited = Waited + 250
+        if not Current or not SameObj(Current.Stream, Stream) or not Valid(Stream) then return true end
+        Waited = math.floor(Now() - T0w)
         if Stream:IsLevelVisible() then
             OnVisible(Map)
             return true
@@ -1280,6 +1627,15 @@ LoopAsync(500, function()
         if not Valid(Pawn) then return end
         local L = Pawn:K2_GetActorLocation()
         local R = Opt(Current.Map, "ExitRadius", 150)
+        Current.WatchTicks = (Current.WatchTicks or 0) + 1
+        if Current.WatchTicks % 60 == 1 and Current.WatchTicks < 400 then          -- every 30 s, a handful of lines
+            local Best, BestD = nil, 1e30
+            for _, E in ipairs(Current.Exits) do
+                local D = Dist2D(L, E)
+                if D < BestD then Best, BestD = E, D end
+            end
+            Log("exit watch: player at %s, nearest exit %s %.1f m away (radius %.1f m)", FmtV(L), Best and Best.Id or "-", BestD / 100, R / 100)
+        end
         for _, E in ipairs(Current.Exits) do
             local DX, DY, DZ = L.X - E.X, L.Y - E.Y, L.Z - E.Z
             if DX * DX + DY * DY < R * R and math.abs(DZ) < 250 then
@@ -1323,7 +1679,7 @@ if Config.AutoLoadInHub then
     end
 end
 
-Log("ready: %d map(s); key %s%s; Hub teardown %s; re-entry %s; gameplay activation %s", #Config.Maps, Config.Key,
+Log("ready: %d map(s); key %s%s; Hub teardown %s; re-entry %s; gameplay activation %s; scripts dir %s", #Config.Maps, Config.Key,
     Config.AutoLoadInHub and (", auto-load " .. Config.AutoLoadInHub .. " in the Hub") or "",
     Opt(nil, "HubTeardown", true) and "on" or "off", Opt(nil, "ReEntry", true) and "on" or "off",
-    Opt(nil, "ActivateGameplay", true) and "on" or "off")
+    Opt(nil, "ActivateGameplay", true) and "on" or "off", ScriptDir())

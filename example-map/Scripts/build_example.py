@@ -5,7 +5,7 @@
 #                                     L_Common uses. Never packed.
 #   /Game/Mods/Example/L_Example      the map itself (streamed into the game), built at ORIGIN.
 #
-# Only engine content that ships with the game is used (BasicShapes, the engine sky dome), so no new shaders: this map
+# Only engine content that comes with the game is used (BasicShapes, the engine sky dome), so no new shaders: this map
 # cooks in stock Epic 4.27 as well as in the special editor. Everything placed is tagged "example" so a rerun rebuilds it.
 import unreal
 
@@ -145,7 +145,7 @@ def build():
     sky.light_component.set_intensity(0.6)
     tagged(sky, "SkyLight")
 
-    # sky: the game sets r.SupportSkyAtmosphere=False, so use the engine sky dome (ships with the game)
+    # sky: the game sets r.SupportSkyAtmosphere=False, so use the engine sky dome (comes with the game)
     dome = ell.spawn_actor_from_object(unreal.load_asset("/Engine/EngineSky/SM_SkySphere"), ORIGIN, unreal.Rotator(0, 0, 0))
     dome.set_actor_scale3d(unreal.Vector(4.0, 4.0, 4.0))
     smc = dome.static_mesh_component

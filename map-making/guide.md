@@ -41,7 +41,7 @@ Things that don't compile shaders, so route A is fine:
 Things that do, so you need route B:
 - any new material, even a flat colour;
 - instances with static switches or overrides;
-- landscapes (each landscape component gets its own material instance);
+- landscapes (each landscape component gets a material instance);
 - probably particle, decal and post-process materials too, though we haven't tried those.
 
 ## 1. What you'll need
@@ -81,9 +81,10 @@ it's an access problem.
 works, or VS 2022 (Build Tools is enough) with "MSVC v142 – VS 2019 C++ x64/x86 build tools" added. You'll also want
 the Windows 10 SDK 10.0.19041, the .NET Framework 4.6.2 targeting pack, Python 3, about 150 GB free, and a few hours.
 
-You'll use three files from this repo: [`tools/merge_gitdeps.py`](../tools/merge_gitdeps.py),
-[`tools/hashpatch.py`](../tools/hashpatch.py) and
-[`engine/itr-ub-layouts.hashpatch.json`](../engine/itr-ub-layouts.hashpatch.json).
+You'll use four files from this repo: [`tools/merge_gitdeps.py`](../tools/merge_gitdeps.py),
+[`tools/hashpatch.py`](../tools/hashpatch.py),
+[`engine/itr-ub-layouts.hashpatch.json`](../engine/itr-ub-layouts.hashpatch.json) and
+[`engine/itr-fullyrough.hashpatch.json`](../engine/itr-fullyrough.hashpatch.json).
 
 ```bat
 :: 1. Get the source at the release tag. Keep the path short, UnrealBuildTool falls over on paths
@@ -101,6 +102,9 @@ python <itr-common>\tools\merge_gitdeps.py Engine\Build\Commit.gitdeps.v35-origi
 
 :: 3. Apply the ITR layout patch. It checks every file first and won't apply twice.
 python <itr-common>\tools\hashpatch.py apply <itr-common>\engine\itr-ub-layouts.hashpatch.json C:\ue427
+:: 3b. Apply the Fully Rough patch (material instances can override "Fully Rough", see below). It touches other files
+::     than the layout patch, so it also applies to an engine that already has the layout patch.
+python <itr-common>\tools\hashpatch.py apply <itr-common>\engine\itr-fullyrough.hashpatch.json C:\ue427
 
 :: 4. Build
 Setup.bat
@@ -139,6 +143,32 @@ came out the same as our patched engine. That's our reading of the EULA, not leg
 There's also one editor scripting helper in there,
 `MaterialEditingLibrary.SetMaterialInstanceStaticSwitchParameterValue`. The game doesn't need it; we used it for
 tooling.
+
+**The Fully Rough patch** (`engine/itr-fullyrough.hashpatch.json`, 6 files). Stock 4.27 has Fully Rough only on the
+material (`UMaterial::bFullyRough`). The game's engine also lets a material instance override it:
+`FMaterialInstanceBasePropertyOverrides` has `bOverride_FullyRough` and `bFullyRough`. Both names are in the
+reflection data of `IntoTheRadius-Win64-Shipping.exe`, next to the other `bOverride_*` members. Without the patch an
+instance can't hold the value, so a rebuilt game instance loses it. With the patch:
+- the two members exist under the same names and save as tagged bool properties, so a cooked instance reads like
+  the game's;
+- the instance editor shows **Fully Rough** under the material property overrides;
+- an overridden value gives the instance its own shader map and compiles it with `MATERIAL_FULLY_ROUGH`, the same
+  as the material flag. Without an override, the instance takes the parent's value.
+
+What the game data shows (2.7.2 paks): about 400 material instances contain `bFullyRough`. Almost all of them hold
+the parent's value without the override flag, which the editor writes in, as it does for `TwoSided`. Two instances
+set the override. Their compiled shaders show what it does: a fully rough base pass doesn't sample reflection
+captures.
+
+| Material | Parent's Fully Rough | Override | Pixel shaders that sample reflection captures |
+|---|---|---|---|
+| `MLI_Electircla_PowerlineDetail_01_b` | `LayeredMaterial`: off | on | 0 of 59 |
+| `MLI_Electircla_PowerlineDetail_01_a` (same parent, no override) | `LayeredMaterial`: off | - | 36 of 59 |
+| `Net` | `M_FoliageMasked`: on | off | 24 of 44 |
+| `M_FoliageMasked` itself | - | - | 0 of 44 |
+
+The patched editor produces the same result. With forward shading, a test master samples reflection captures in
+8 of 8 pixel shaders, and an instance of it with the override on samples them in 0 of 8.
 
 **Checking your build.** It's worth doing before you make anything. This compares the uniform buffers your editor
 builds with the game's (`pip install pefile capstone` first):
@@ -187,7 +217,7 @@ A few rules we worked out:
   start. The exit has to bring the Hub back (§6). *Harness-tested* on the showcase map: after the teardown the player
   stayed put for 20 s, and teleport points across the 2.5 km map each held for 10 s. We haven't been back in VR since
   the fix. The UE4SS loader has this built in, but it's untested in its Lua form (see the
-  [loader README](../loader-ue4ss/README.md)). It also takes the Hub's fog and lighting away, so give your map its own.
+  [loader README](../loader-ue4ss/README.md)). It also takes the Hub's fog and lighting away, so give your map fog and lighting.
   We expect that to be a good thing but haven't looked at it in VR.
 - **Start and exit.** Put a `TargetPoint` tagged `itr:player_start` where players should arrive (Details, Actor,
   Tags). Add another tagged `itr:exit`, with something visible on it. Stepping onto that one takes you back to the
@@ -204,18 +234,18 @@ A few rules we worked out:
   and the `Prefab_Zone_*` blueprints (which are just engine components). Anything you place this way is included in
   your navmesh. If the SDK's copy of a material instance is missing or stale (it has stripped textures, wrong
   parents and some outdated static switches), [`tools/material-export`](../tools/material-export/) reads the real
-  instance from the game's own files and rebuilds it in the editor (export side checked, editor script untested).
+  instance from the game's files and rebuilds it in the editor (export side checked, editor script untested).
 - **Stand-ins for game meshes that aren't in any SDK.** See "Editor stand-ins" below.
 - **Gameplay blueprints** (spawners, rifts, stashes, loot points, anomalies). Their C++ parents live in the game's
   `IntoTheRadius` code module, and a blueprint-only project can't load that. The ITR-SDK has a recreation of the
   module (`Source/IntoTheRadius`): the real class, property and function declarations, with empty function bodies. That
-  is all the editor needs to load the blueprints. The game uses its own real module, so none of this gets packed.
+  is all the editor needs to load the blueprints. The game uses its real module, so none of this gets packed.
   *Harness-tested*, not yet looked at in VR:
   - **Compiling it.** Copy `Source/IntoTheRadius` and the plugins it needs (`VRExpansionPlugin`, `ModFramework`) from the
     SDK into your project, copy the SDK's `.Target.cs` files, list the module in your `.uproject`, and build the editor target with the patched fork. It
     built with no errors in 87 s in a scratch project (and 67 s in the showcase project). The project is then a code
     project, and `build-map.ps1` is still fine because it only packs `/Game/Mods/<Name>`.
-  - **Which SDK's blueprints.** Use ChuckSharts's. R3mains's copies of the same blueprints reference its own mod
+  - **Which SDK's blueprints.** Use ChuckSharts's. R3mains's copies of the same blueprints reference its mod
     content (`/Game/Mods/r3mains/...`), which then wants to come along with your map. Copy each blueprint with
     whatever it references, at the same paths, like any other game asset.
   - **Placing them from Python.** `EditorLevelLibrary.spawn_actor_from_object(<blueprint asset>, location, rotation)`
@@ -225,7 +255,7 @@ A few rules we worked out:
     Whether those keys work for a level that's streamed in as a dynamic instance is unknown.
   - **They don't start by themselves.** In the harness, `BP_MonsterSpawner`, `BP_MonsterSpawnGenerator`, loot points,
     stashes and anomalies placed in a streamed map sat idle. The game sends them level-start events when it loads its
-    own levels, and a streamed one has missed them. With the activation calls in
+    levels, and a streamed one has missed them. With the activation calls in
     [`extended.md`](extended.md) (a runtime mod, or the UE4SS loader): 2 Mimics spawned and stood on the navmesh, and
     loot points produced items.
 
@@ -238,7 +268,7 @@ a lot of tunnel, cave and pier meshes. The cooked map only stores asset *paths* 
 only holds `/Game/Mods/<Name>`. So the editor only needs *something* at the identical package path to place, size and
 collide against. In game the real asset gets loaded in its place.
 
-Our `standins.py` does that for static meshes. It reads the mesh out of the game's own files (you unpack them yourself),
+Our `standins.py` does that for static meshes. It reads the mesh out of the game's files (you unpack them yourself),
 writes an FBX with the game's simple collision, material slot names and lightmap settings, and imports that at the
 same `/Game/...` path in a scratch project with a plain grid material. Each one is tagged `itr_standin=1`, so the tool
 never overwrites a real SDK copy. A few rules:
@@ -263,7 +293,7 @@ The game bakes its whole navmesh into `L_Common`, the level that's always loaded
 that file, your editor uses the same settings: Default is radius 20, height 140, step 40; Big is radius 400, height
 200; cell size 20 and 10 m tiles.
 
-A streamed level can carry its own navmesh tiles. When it streams in, they get added to the persistent level's navmesh
+A streamed level can carry navmesh tiles. When it streams in, they get added to the persistent level's navmesh
 with the same name. You can't open `L_Common` in the editor because it only exists cooked (the SDK copy too). So the
 example uses a small editor-only stand-in, `L_ExampleHost`. Your map is a sublevel of it, and its navmesh actors
 get the same names as the game's.
@@ -340,7 +370,7 @@ function.
    - set `LevelTransform` to identity;
    - call `SetShouldBeLoaded(true)` and `SetShouldBeVisible(true)`.
 2. Once the streaming level says `IsLevelVisible()`, find the `TargetPoint` tagged `itr:player_start` in its level and
-   call `K2_TeleportTo` on the player pawn. The game has its own `TeleportPlayer` event, but you can't call it this way.
+   call `K2_TeleportTo` on the player pawn. The game has a `TeleportPlayer` event, but you can't call it this way.
 3. For maps with baked lighting, hide the Hub's lighting-scenario level (see §7).
 4. Give people a way out. Our script remembers where you were, and when you step within 1.5 m of a `TargetPoint`
    tagged `itr:exit` (or press the key), it moves you back there and then unloads the map. Put an exit in every map,
@@ -359,7 +389,7 @@ function.
       they're all unloaded. Leave any level that holds the player's pawn or controller.
    5. Only now teleport to the real start.
 
-   **Leaving** with the Hub gone: while the player is still on your map, call the game's own
+   **Leaving** with the Hub gone: while the player is still on your map, call the game's
    `LevelManager::LoadLevel(Level.Hub)`. It takes a gameplay tag by value, so it isn't hit by the out-parameter bug
    above. Wait until the Hub is visible and the level manager is ready, and check the player ended up in the Hub. If the
    game didn't move them, teleport them back to where they stood. The game's Hub load **leaves your streamed map
@@ -383,7 +413,7 @@ shows as visible even though you're still standing in the menu room. Our script 
 | Maps outside the Hub's 6000 m radius, or west of X −30,000 | Radius: the map has to stay inside, or a mod lifts the limit (VR-tested for the 1.0 port). West of −30,000: needs the Hub torn down (§4, §6). Harness-tested |
 | Placing gameplay blueprints in the editor | Works (§4). Harness-tested |
 | Making placed spawners, loot, stashes and anomalies actually start | Needs a runtime mod to send the level-start events ([`extended.md`](extended.md)). Harness-tested |
-| Your own loot tags and budgets | Registering them at load worked in the harness; shipping your own loot DataTables is in progress ([`extended.md`](extended.md)) |
+| Your own loot tags and budgets | Registering them at load worked in the harness; including your own loot DataTables is in progress ([`extended.md`](extended.md)) |
 | Getting into the map | Needs a loader (§6) |
 | Gates and travel, map screen, missions, saves | Not available. These are all per-zone data assets (`DA_SystemConfig.LevelConfigurations`, `DA_MapPointsConfig`, `/Game/ITR/Configurations/Missions`). Registering a map there (a level config entry, a streaming entry, gates, map points) might let the game treat it like a normal zone, saves and travel included. That would mean overriding the game's data assets. Unexplored |
 | AI cover (mimics taking cover) | The data format is understood and we have an offline generator, but nobody has seen a mimic use it yet ([`extended.md`](extended.md)). Offline only |
@@ -417,9 +447,9 @@ shows as visible even though you're still standing in the menu room. Our script 
 | UE4SS logs `StrProperty can only be set to a string or FString` | UE4SS 3.0.1 reads the wrong argument after a non-struct out-parameter | Avoid those functions. Our loader uses `CreateInstance` instead of `LoadLevelInstance` |
 | The map loads while you're still in the menu room | The Hub level counts as visible during the transition | Wait for `LevelManager::IsReady()` (our loader does) |
 | You arrive and get thrown back to the Hub within a second, but only on part of the map | The snap-back west of X ≈ −30,000 while the Hub's levels are loaded (§4) | Tear the Hub down (§6 step 6), or move the map east |
-| Spawners, loot points, stashes or anomalies you placed do nothing in game | A streamed level misses the level-start events the game sends its own levels | Send them yourself ([`extended.md`](extended.md)) |
+| Spawners, loot points, stashes or anomalies you placed do nothing in game | A streamed level misses the level-start events the game sends to its levels | Send them yourself ([`extended.md`](extended.md)) |
 | Headless editor crashes spawning an actor | `spawn_actor_from_class` without a rotator, or spawning a native class like `CoverLoader` directly | Use `spawn_actor_from_object` with a blueprint asset (§4) |
-| Unloading the map after an exit leaves you in the void | You unloaded the level under the player | Move the player first, and use the game's own Hub load on the way out (§6) |
+| Unloading the map after an exit leaves you in the void | You unloaded the level under the player | Move the player first, and use the game's Hub load on the way out (§6) |
 
 ## What's in the repo
 | Path | What |

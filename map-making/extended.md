@@ -4,7 +4,7 @@ This goes with [`guide.md`](guide.md), which covers building and loading a map. 
 a mod running code inside the game: spawning stuff, enemies, lighting and so on. For each one we've written down how
 we did it and how far we tested it.
 
-We did all of this with our own C++ mod, which we're not releasing. The idea is that anyone can rebuild the bits they
+We did all of this with our C++ mod, which we're not releasing. The idea is that anyone can rebuild the bits they
 want in whatever framework they like, as long as it can call engine functions (UFunctions) on the game thread.
 
 When we say **VR** we tested it in the headset. **Desktop** means we ran the game with `-nohmd` and checked that it
@@ -31,7 +31,7 @@ is in [`guide.md`](guide.md) §6, and the UE4SS version is in [`loader-ue4ss/`](
 
 ### Replacing the Hub while your map is loaded (harness)
 If the map is west of about X −30,000 (or you want the Hub's fog and lighting gone), unload all the Hub's streaming
-levels once the player is standing on your map, and bring the Hub back with the game's own
+levels once the player is standing on your map, and bring the Hub back with the game's
 `LevelManager::LoadLevel(Level.Hub)` on the way out. The sequence, and why, is in [`guide.md`](guide.md) §4 and §6.
 Our C++ mod does it and it passed the harness: the player stayed put for 20 s and all the teleport points across a
 2.5 km map held; the exit left the player in `Level.Hub` with the Hub levels visible. Two details from that:
@@ -98,7 +98,7 @@ doesn't change it.
 Harness result (C++ mod, 10 actors: a rift, a Mimic spawner, 4 random-loot points, a stash, 3 anomalies): every call
 found its function, 2 live Mimics showed up 8 s later 7 to 9 m from the spawner and stood on the navmesh, and the 5 loot
 nodes made 7 items that physically sat next to them. What we haven't separated: whether the Mimics came from the
-spawner's own `Wild` proximity logic or from the generator. With `Wild` off and our own generator ID, nothing spawned
+spawner's `Wild` proximity logic or from the generator. With `Wild` off and our generator ID, nothing spawned
 in the 25 s we watched, so the generator path is *not* shown. Also untested: the tide (do these actors reset?), and
 anything in VR. The UE4SS loader has a Lua port of this which hasn't been run
 ([`loader-ue4ss/`](../loader-ue4ss/README.md)).
@@ -110,14 +110,14 @@ unregistered ID (the game may log "Generator ID is invalid").
 
 ## Loot: budgets, your own tags and tables
 How loot is chosen, from the blueprints and the exe, and then checked in the harness where it says so:
-- A loot node (`BP_RandomLoot`, stashes, corpses) has a `LootTable` gameplay tag and its own `LootPoints` cap.
+- A loot node (`BP_RandomLoot`, stashes, corpses) has a `LootTable` gameplay tag and a `LootPoints` cap.
 - `DA_GameConfig.LootArray` maps tag to `{DataTable, LootPoints, Conditions}`. `LootPoints` there is the tag's
   **budget**: nodes using the tag draw rows from its DataTable until the budget's spent. That's why a big map with few
   tags comes out sparse. The lookup is by tag only; there's no level in it, so it works on a streamed map (harness).
 - Points already spent are saved with the game, in `USpawnerGameData.LootTablePoints`. **The key is the DataTable's
   name** (`DT_Loot_Buffer_Valuables`), not the tag, and has no zone part (harness). Two tags that share a DataTable
   share their spent points, and so does your tag with a vanilla one if you borrow its table. We saw the real Buffer
-  tables' used points change when ours borrowed them. The tags' own budgets didn't change.
+  tables' used points change when ours borrowed them. The tags' budgets didn't change.
 - `GenerateLoot` saves its result per node (`InstanceID`), so reloading doesn't re-roll. Give your nodes unique IDs
   with your own prefix; vanilla uses `RandomLoot-NNNN`.
 
@@ -132,8 +132,8 @@ What the budget does, as measured: a tag with budget 1 and a node asking for 4 p
 holds. A tag with budget **0** still gave one item (1 point used of 0), so 0 isn't a way to switch a tag off, and we don't
 know why. Which of "hidden" or "falls back to the current level's loot" happens when a budget runs out isn't settled.
 
-**Shipping your own DataTables** *(in progress)*. Because the spent points are keyed by table name, giving each tag its
-own DataTable (a copy of a donor's rows under `/Game/Mods/<Name>/Loot/`) keeps you off the vanilla budgets. Our
+**Including your own DataTables** *(in progress)*. Because the spent points are keyed by table name, giving each tag a
+DataTable (a copy of a donor's rows under `/Game/Mods/<Name>/Loot/`) keeps you off the vanilla budgets. Our
 generator makes 31 of them from the game's tables (1,211 rows). They build in the editor; we have not yet cooked them and
 run them in the game, so we can't say yet that the game accepts them. One risk is that the table is read and cached
 the first time its tag is used, so point the entry at it before then.
@@ -166,7 +166,7 @@ scale every `ExponentialHeightFogComponent`'s density, and put it all back when 
 Maps with baked lighting also need the Hub's lighting-scenario level hidden (see [`guide.md`](guide.md) §7).
 
 You can also drive a level's directional light, sky light and fog from curves at runtime for a day/night cycle. We
-did this in VR to bring back ITR 1.0's own day/night and fog weather, using 1.0's curve assets. Changing intensity and
+did this in VR to bring back ITR 1.0's day/night and fog weather, using 1.0's curve assets. Changing intensity and
 colour doesn't need a sky recapture.
 
 One thing that bit us: if you load a `USoundBase` (or anything else) with `LoadAsset_Blocking` and only keep it in a
@@ -175,7 +175,7 @@ or just load it again each time.
 
 ## Swapping materials by role (VR, but you probably don't need it)
 Meshes tagged `mat:<role>` get one of the game's material instances assigned at runtime with `SetMaterial`. We used
-this before we had the special editor. Now maps can use their own materials, or reference the game's in the editor.
+this before we had the special editor. Now maps can use custom materials, or reference the game's in the editor.
 
 ## Gameplay without a mod: generated blueprints (cooks fine, untested in game)
 If all you want is a teleport pad, a light that follows something, or a trigger, you don't need a runtime mod: a

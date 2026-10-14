@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
   Copies the game's DefaultEngine.ini (render settings, navmesh agents, collision channels) into this project's Config\.
-  It is inside the game's pakchunk0; UnrealPak (ships with every editor) extracts it in about a second.
+  It is inside the game's pakchunk0; UnrealPak (comes with every editor) extracts it in about a second.
 .EXAMPLE
   .\extract-game-config.ps1 -Engine "C:\ue427\Engine"
   .\extract-game-config.ps1 -Engine "C:\Program Files\Epic Games\UE_4.27\Engine"

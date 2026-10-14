@@ -25,7 +25,7 @@ material instance you get everything the instance sets. That means:
 | [`compare_editor_copy.py`](compare_editor_copy.py) | Checks an export against an editor copy of the same asset, e.g. the SDK's | [UAssetGUI](https://github.com/atenfyr/UAssetGUI) |
 
 ## Use
-Unpack the game's paks yourself first (`repak unpack` or UnrealPak; this repo doesn't ship any game data), so you have
+Unpack the game's paks yourself first (`repak unpack` or UnrealPak; this repo doesn't include any game data), so you have
 a folder like `<unpacked>\IntoTheRadius\Content\...` holding `.uasset` + `.uexp` files.
 
 ```bat
@@ -52,7 +52,7 @@ In the editor (Output Log console, or File > Execute Python Script with the opti
 py "C:/path/material_import_ue.py" "C:/path/exports" --dest /Game/Recreated
 ```
 Options: `--fallback-parent /Game/MyMaster` (used when the parent isn't in the project and the chain isn't exported),
-`--no-stubs`, `--no-placeholders`, `--overwrite`, `--no-save`. Assets go under `--dest`, not at the game's own paths,
+`--no-stubs`, `--no-placeholders`, `--overwrite`, `--no-save`. Assets go under `--dest`, not at the game's paths,
 because an asset at the game's path inside a pak would shadow the game's original. A report of what was created,
 skipped, or couldn't be set goes to `<project>\Saved\matexport_report.json`.
 
@@ -77,7 +77,7 @@ python compare_editor_copy.py exports\Mi_LandscapeV6_Swamp.json <sdk>\Content\AR
 | Reading 2.7.2 instances and masters: parent, scalar / vector / texture parameters, static switches, overrides, material layer stacks, master settings and cached parameters, texture settings | **Yes, offline.** 230 instances and 70 masters from the unpacked 2.7.2 game that also exist in the ITR-SDK were compared with the SDK's editor copies (see below) |
 | Same on the 1.0 game (UE 4.26) | No. The reader is written for 4.26 and 4.27 headers but only 2.7.2 was run through this version |
 | `material_import_ue.py` in the editor | **Yes, headless** (`UE4Editor-Cmd -run=pythonscript -nullrhi`, our fork 4.27). 10 real 2.7.2 instances (+ 9 masters/parents, 57 placeholder textures) were recreated, saved, and read back in a fresh session with `verify_in_editor.py`: 828 checks, **0 mismatches**. Cases: instance with 6 to 8 static switches; instances with base property overrides (Masked + two-sided; Masked + TwoSidedFoliage + dithered LOD + clip value; Unlit masked); a landscape instance; a foliage instance with `Tint`; a plain prop instance; an instance of an instance (`M_Yarrow_PP_Wind_Inst`); a decal instance; a master. Exact on: parents, all global scalar / vector / texture parameter values, switch values, override flags and values, stand-in master parameter names and defaults, master blend / shading / domain / two-sided / clip settings, placeholder compression / sRGB / LOD group |
-| Stand-in masters keep their parameters | **Yes.** Unconnected scalar, vector and texture parameter nodes do show up in `get_*_parameter_names` and instances accept values for them. Static switches have to be declared on the master too (the importer adds them, taken from the instances' own switch lists, default off) or the instance can't hold them |
+| Stand-in masters keep their parameters | **Yes.** Unconnected scalar, vector and texture parameter nodes do show up in `get_*_parameter_names` and instances accept values for them. Static switches have to be declared on the master too (the importer adds them, taken from the instances' switch lists, default off) or the instance can't hold them |
 | Every enum value the game uses maps to the editor's Python enum (blend, shading model, domain, translucency lighting, texture compression, LOD group) | **Yes**, checked against all values in 3,064 textures and 1,633 materials |
 | Rebuilt instances render the same as the game's | **No.** Not byte-for-byte (a recreated instance has a new shader map from *your* master), not visually. A stand-in master has no graph, so an instance on it is only a container for the numbers. A rendered editor screenshot was not obtained (the shader compile of a fresh scratch project did not finish inside the time limit) |
 | Layer stacks, layer / blend parameters, static component masks | Exported, not imported: the Python API can't set them (listed in the report). `ShouldDoForwardSSR`-style overrides that the editor struct doesn't have are listed too |

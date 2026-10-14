@@ -1,0 +1,509 @@
+{
+ "format": "hashpatch/1",
+ "files": [
+  {
+   "path": "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstanceBasePropertyOverrides.h",
+   "sha256": "1eaeba7fd92d32fff6abfbc588955629775cf540346e3af2fce0f3f7158924a5",
+   "edits": [
+    {
+     "line": 40,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t/** ITR: enables override of the fully rough property (same name and serialization as Into the Radius 2.7.2's engine). */"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstanceBasePropertyOverrides.h",
+        17
+       ]
+      },
+      {
+       "text": "\tuint8 bOverride_FullyRough : 1;"
+      },
+      {
+       "text": ""
+      }
+     ]
+    },
+    {
+     "line": 44,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t/** ITR: forces the material to be completely rough (UMaterial::bFullyRough per instance: MATERIAL_FULLY_ROUGH permutation). */"
+      },
+      {
+       "text": "\tUPROPERTY(EditAnywhere, Category = Material, meta = (editcondition = \"bOverride_FullyRough\"))"
+      },
+      {
+       "text": "\tuint8 bFullyRough : 1;"
+      },
+      {
+       "text": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+   "sha256": "b9afe16cf3ab37961f0442d315e622cb4842f49be95b136b269c2a162752e41b",
+   "edits": [
+    {
+     "line": 361,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t/** ITR: cached bFullyRough (BasePropertyOverrides.bFullyRough when overridden, else the parent's). */"
+      },
+      {
+       "text": "\tuint8 bFullyRough : 1;"
+      }
+     ]
+    },
+    {
+     "line": 552,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t/** ITR: the fully rough flag this instance compiles with. */"
+      },
+      {
+       "text": "\tENGINE_API bool IsFullyRough() const;"
+      },
+      {
+       "text": "\t/** ITR: fully rough flag of any material interface (a material's bFullyRough, an instance's IsFullyRough()). */"
+      },
+      {
+       "text": "\tENGINE_API static bool GetFullyRough(const UMaterialInterface* Material);"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+   "sha256": "54cb934d4c9dc8de78199e34e1a17d8fc1b71f5fd4f7c16cc8b526c210ed9aee",
+   "edits": [
+    {
+     "line": 2695,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t\tbFullyRough = 0;"
+      }
+     ]
+    },
+    {
+     "line": 2778,
+     "remove": [],
+     "add": [
+      {
+       "text": ""
+      },
+      {
+       "text": "\t// ITR: same pattern as TwoSided; the non-overridden value holds the parent's (as in the game's cooked instances)"
+      },
+      {
+       "text": "\tif (BasePropertyOverrides.bOverride_FullyRough)"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        52
+       ]
+      },
+      {
+       "text": "\t\tbFullyRough = BasePropertyOverrides.bFullyRough != 0;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        57
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+        257
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        52
+       ]
+      },
+      {
+       "text": "\t\tbFullyRough = GetFullyRough(Parent);"
+      },
+      {
+       "text": "\t\tBasePropertyOverrides.bFullyRough = bFullyRough;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        57
+       ]
+      }
+     ]
+    },
+    {
+     "line": 4409,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t// ITR: bFullyRough override (changes MATERIAL_FULLY_ROUGH, so it must key the shader map)"
+      },
+      {
+       "text": "\tbool bUsedIsFullyRough = IsFullyRough();"
+      },
+      {
+       "text": "\tif (bUsedIsFullyRough != (Mat->bFullyRough != 0))"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        52
+       ]
+      },
+      {
+       "text": "\t\tconst FString HashString = TEXT(\"bOverride_FullyRough\");"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+        4361
+       ]
+      },
+      {
+       "text": "\t\tHash.Update((uint8*)&bUsedIsFullyRough, sizeof(bUsedIsFullyRough));"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+        4363
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        57
+       ]
+      }
+     ]
+    },
+    {
+     "line": 4426,
+     "remove": [
+      "06cee35e96a203e7da5ddffe8a014ef92b61c284e581ea47ec504a8ba8d11335"
+     ],
+     "add": [
+      {
+       "text": "\t\t(GetCastDynamicShadowAsMasked() != Parent->GetCastDynamicShadowAsMasked()) ||"
+      },
+      {
+       "text": "\t\t(IsFullyRough() != GetFullyRough(Parent))"
+      }
+     ]
+    },
+    {
+     "line": 4465,
+     "remove": [],
+     "add": [
+      {
+       "text": "bool UMaterialInstance::IsFullyRough() const"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstanceBasePropertyOverrides.h",
+        13
+       ]
+      },
+      {
+       "text": "\treturn bFullyRough;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        292
+       ]
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "bool UMaterialInstance::GetFullyRough(const UMaterialInterface* InMaterial)"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstanceBasePropertyOverrides.h",
+        13
+       ]
+      },
+      {
+       "text": "\tif (const UMaterialInstance* Instance = Cast<const UMaterialInstance>(InMaterial))"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        52
+       ]
+      },
+      {
+       "text": "\t\treturn Instance->IsFullyRough();"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        57
+       ]
+      },
+      {
+       "text": "\tif (const UMaterial* BaseMaterial = Cast<const UMaterial>(InMaterial))"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        52
+       ]
+      },
+      {
+       "text": "\t\treturn BaseMaterial->bFullyRough != 0;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        57
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+        828
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        292
+       ]
+      },
+      {
+       "text": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Private/Materials/MaterialShared.cpp",
+   "sha256": "762b858120dea3c612b8321cdf4a52201bc1a1a7fed1249ce36d9dcb8cca75cf",
+   "edits": [
+    {
+     "line": 1360,
+     "remove": [
+      "9f8e3679d60b957cca60baa7a3f33a45a76d0e206219651ae4d546eb4e074979"
+     ],
+     "add": [
+      {
+       "text": "\t// ITR: instance override (FMaterialInstanceBasePropertyOverrides::bFullyRough), like IsTwoSided"
+      },
+      {
+       "text": "\treturn MaterialInstance ? MaterialInstance->IsFullyRough() : Material->bFullyRough;"
+      }
+     ]
+    },
+    {
+     "line": 4014,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t,bOverride_FullyRough(false)"
+      }
+     ]
+    },
+    {
+     "line": 4015,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t,bFullyRough(0)"
+      }
+     ]
+    },
+    {
+     "line": 4035,
+     "remove": [
+      "af17c9ae24d966a1fcc29d5db53a1e3f4413c4f7dbdd7ee479727649c5e9c2ef"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tDitheredLODTransition == Other.DitheredLODTransition &&"
+      },
+      {
+       "text": "\t\t\tbOverride_FullyRough == Other.bOverride_FullyRough &&"
+      },
+      {
+       "text": "\t\t\tbFullyRough == Other.bFullyRough;"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Editor/UnrealEd/Private/PreviewMaterial.cpp",
+   "sha256": "2b81c6820030944f4e76ad5556422cf77a3f07a94895b277a622881a5a6d71d9",
+   "edits": [
+    {
+     "line": 1808,
+     "remove": [],
+     "add": [
+      {
+       "text": "\tif (!BasePropertyOverrides.bOverride_FullyRough)\t// ITR"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        52
+       ]
+      },
+      {
+       "text": "\t\tBasePropertyOverrides.bFullyRough = SourceInstance->IsFullyRough();"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        57
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+   "sha256": "9eb279c41e25270f711e060a0a81fecfcbee0cb85128852e02528abf9cb14a3a",
+   "edits": [
+    {
+     "line": 1260,
+     "remove": [],
+     "add": [
+      {
+       "text": ""
+      },
+      {
+       "text": "\t// ITR: bFullyRough override (FMaterialInstanceBasePropertyOverrides::bOverride_FullyRough / bFullyRough)"
+      },
+      {
+       "text": "\tTSharedPtr<IPropertyHandle> FullyRoughProperty = BasePropertyOverridePropery->GetChildHandle(\"bFullyRough\");"
+      },
+      {
+       "text": "\tif (FullyRoughProperty.IsValid())"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        52
+       ]
+      },
+      {
+       "text": "\t\tTAttribute<bool> IsOverrideFullyRoughEnabled = TAttribute<bool>::Create(TAttribute<bool>::FGetter::CreateLambda([this]() {"
+      },
+      {
+       "text": "\t\t\treturn MaterialEditorInstance->BasePropertyOverrides.bOverride_FullyRough != 0;"
+      },
+      {
+       "text": "\t\t}));"
+      },
+      {
+       "text": "\t\tFIsResetToDefaultVisible IsFullyRoughPropertyResetVisible = FIsResetToDefaultVisible::CreateLambda([this](TSharedPtr<IPropertyHandle> InHandle) {"
+      },
+      {
+       "text": "\t\t\treturn MaterialEditorInstance->Parent != nullptr ? (MaterialEditorInstance->BasePropertyOverrides.bFullyRough != 0) != UMaterialInstance::GetFullyRough(MaterialEditorInstance->Parent) : false;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+        711
+       ]
+      },
+      {
+       "text": "\t\tFResetToDefaultHandler ResetFullyRoughPropertyHandler = FResetToDefaultHandler::CreateLambda([this](TSharedPtr<IPropertyHandle> InHandle) {"
+      },
+      {
+       "text": "\t\t\tif (MaterialEditorInstance->Parent != nullptr)"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        818
+       ]
+      },
+      {
+       "text": "\t\t\t\tMaterialEditorInstance->BasePropertyOverrides.bFullyRough = UMaterialInstance::GetFullyRough(MaterialEditorInstance->Parent);"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        836
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+        711
+       ]
+      },
+      {
+       "text": "\t\tFOnBooleanValueChanged OnOverrideFullyRoughChanged = FOnBooleanValueChanged::CreateLambda([this](bool NewValue) {"
+      },
+      {
+       "text": "\t\t\tMaterialEditorInstance->BasePropertyOverrides.bOverride_FullyRough = NewValue;"
+      },
+      {
+       "text": "\t\t\tMaterialEditorInstance->PostEditChange();"
+      },
+      {
+       "text": "\t\t\tFEditorSupportDelegates::RedrawAllViewports.Broadcast();"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+        711
+       ]
+      },
+      {
+       "text": "\t\tIDetailPropertyRow& FullyRoughPropertyRow = BasePropertyOverrideGroup.AddPropertyRow(FullyRoughProperty.ToSharedRef());"
+      },
+      {
+       "text": "\t\tFullyRoughPropertyRow"
+      },
+      {
+       "text": "\t\t\t.DisplayName(FullyRoughProperty->GetPropertyDisplayName())"
+      },
+      {
+       "text": "\t\t\t.ToolTip(FullyRoughProperty->GetToolTipText())"
+      },
+      {
+       "text": "\t\t\t.EditCondition(IsOverrideFullyRoughEnabled, OnOverrideFullyRoughChanged)"
+      },
+      {
+       "text": "\t\t\t.Visibility(TAttribute<EVisibility>::Create(TAttribute<EVisibility>::FGetter::CreateSP(this, &FMaterialInstanceParameterDetails::IsOverriddenAndVisible, IsOverrideFullyRoughEnabled)))"
+      },
+      {
+       "text": "\t\t\t.OverrideResetToDefault(FResetToDefaultOverride::Create(IsFullyRoughPropertyResetVisible, ResetFullyRoughPropertyHandler));"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+        57
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

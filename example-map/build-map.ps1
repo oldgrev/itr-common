@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Cooks a map from this project, packs only its own /Game/Mods/<Map> packages into zzz_ITRMap_<Map>_P.pak and
+  Cooks a map from this project, packs only the /Game/Mods/<Map> packages into zzz_ITRMap_<Map>_P.pak and
   (optionally) installs it into the game.
 .EXAMPLE
   .\build-map.ps1 -Engine "C:\ue427\Engine"                       # cook + pak /Game/Mods/Example/L_Example
@@ -20,7 +20,7 @@ $PakName = "zzz_ITRMap_$($Map)_P.pak"
 $Pak     = Join-Path $OutDir $PakName
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 
-# 1. Cook. -unversioned: the game's own packages are unversioned. Old cooked files are removed first so assets the
+# 1. Cook. -unversioned: the game's packages are unversioned. Old cooked files are removed first so assets the
 #    map no longer uses aren't packed.
 Remove-Item $Cooked -Recurse -Force -ErrorAction SilentlyContinue
 $log = Join-Path $OutDir "cook_$Map.log"
@@ -30,7 +30,7 @@ Write-Host "Cooking /Game/Mods/$Map/L_$Map (log: $log)"
 if ($LASTEXITCODE -ne 0) { throw "Cook failed ($LASTEXITCODE); see $log" }
 
 # 2. Response file: one line per file, "<file on disk>" "<path inside the game>". Only /Game/Mods/<Map>: anything
-#    else in the cook output (engine content, game assets copied from the ITR-SDK) would override the game's own files.
+#    else in the cook output (engine content, game assets copied from the ITR-SDK) would override the game's files.
 #    The stand-in host level (L_*Host) is editor-only and is left out.
 $resp = Join-Path $OutDir "pak_$Map.txt"
 $files = Get-ChildItem $Cooked -Recurse -File | Where-Object { $_.Name -notlike "L_*Host.*" }
