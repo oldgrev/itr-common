@@ -81,10 +81,12 @@ it's an access problem.
 works, or VS 2022 (Build Tools is enough) with "MSVC v142 – VS 2019 C++ x64/x86 build tools" added. You'll also want
 the Windows 10 SDK 10.0.19041, the .NET Framework 4.6.2 targeting pack, Python 3, about 150 GB free, and a few hours.
 
-You'll use four files from this repo: [`tools/merge_gitdeps.py`](../tools/merge_gitdeps.py),
+You'll use these files from this repo: [`tools/merge_gitdeps.py`](../tools/merge_gitdeps.py),
 [`tools/hashpatch.py`](../tools/hashpatch.py),
-[`engine/itr-ub-layouts.hashpatch.json`](../engine/itr-ub-layouts.hashpatch.json) and
-[`engine/itr-fullyrough.hashpatch.json`](../engine/itr-fullyrough.hashpatch.json).
+[`engine/itr-ub-layouts.hashpatch.json`](../engine/itr-ub-layouts.hashpatch.json),
+[`engine/itr-fullyrough.hashpatch.json`](../engine/itr-fullyrough.hashpatch.json),
+[`engine/itr-forwardssr.hashpatch.json`](../engine/itr-forwardssr.hashpatch.json) and, if you import game particle
+systems, [`engine/itr-particles-keep-cooked.hashpatch.json`](../engine/itr-particles-keep-cooked.hashpatch.json).
 
 ```bat
 :: 1. Get the source at the release tag. Keep the path short, UnrealBuildTool falls over on paths
@@ -105,6 +107,11 @@ python <itr-common>\tools\hashpatch.py apply <itr-common>\engine\itr-ub-layouts.
 :: 3b. Apply the Fully Rough patch (material instances can override "Fully Rough", see below). It touches other files
 ::     than the layout patch, so it also applies to an engine that already has the layout patch.
 python <itr-common>\tools\hashpatch.py apply <itr-common>\engine\itr-fullyrough.hashpatch.json C:\ue427
+:: 3b2. Apply the Forward SSR patch (the "Should Do Forward SSR" override, see below). It builds on the Fully Rough
+::      patch: apply it after 3b.
+python <itr-common>\tools\hashpatch.py apply <itr-common>\engine\itr-forwardssr.hashpatch.json C:\ue427
+:: 3c. Optional: keep imported cooked particle systems as cooked (see below). Only needed to import game particle systems.
+python <itr-common>\tools\hashpatch.py apply <itr-common>\engine\itr-particles-keep-cooked.hashpatch.json C:\ue427
 
 :: 4. Build
 Setup.bat
@@ -169,6 +176,37 @@ captures.
 
 The patched editor produces the same result. With forward shading, a test master samples reflection captures in
 8 of 8 pixel shaders, and an instance of it with the override on samples them in 0 of 8.
+
+**The Forward SSR patch** (`engine/itr-forwardssr.hashpatch.json`, 8 files; apply it after the Fully Rough patch).
+The game's engine has a forward screen space reflections switch: `UMaterial::bScreenSpaceReflectionsForward`, and
+on material instances `FMaterialInstanceBasePropertyOverrides::bOverride_ShouldDoForwardSSR` plus
+`bShouldDoForwardSSR`. Stock 4.27 has none of the three. With the patch:
+- the three members exist under the game's names and save as tagged bool properties;
+- the instance editor shows **Should Do Forward SSR** under the material property overrides; an instance without the
+  override takes the parent's value;
+- the effective value gives an instance whose value differs from its material its own shader map and sets
+  `MATERIAL_SHOULD_DO_FORWARD_SSR` in the shader environment.
+
+This stores and carries the setting; it does not add the reflection pass itself. The fork's shaders have no forward
+SSR code, so the define is unused until a shader reads it. In the 2.7.2 paks five instances set the override: three
+`LayeredMaterial` instances turn it on (the parent has it off), one turns it off, and the swamp water instance repeats
+the value of `M_MasterWaterMaterial`, the one material that has the flag on.
+
+**The cooked particles patch** (`engine/itr-particles-keep-cooked.hashpatch.json`, 2 files:
+`ParticleComponents.cpp`, `ParticleModules.cpp`). A cooked particle system has no Distribution objects; they are
+stripped at cook. A GPU emitter (`ParticleModuleTypeDataGpu`) still works in game because its `EmitterInfo` and
+`ResourceData` (curve samples, scales and biases, computed by the editor before cooking) are saved in the package.
+When you recreate such a system in the stock editor, `UParticleEmitter::Build` runs on every load and property
+change. It recompiles the modules, which crashes without the distributions. Even with distributions rebuilt from
+the cooked data, the result differs: we got different `ColorScale` / `ColorBias` and 548 differing quantized samples.
+
+With the patch, a package that has the metadata marker `ItrKeepCookedParticleBuild` builds the way a cooked game
+does: no `CompileModules`, `EmitterInfo` / `ResourceData` stay as loaded, and the GPU resources are created from them.
+Put the marker in the package's `RootMetaDataMap`. A marker on the package object or on the system also counts. That
+covers every path that rebuilds: load (`UParticleEmitter::PostLoad`), property edits (`UParticleEmitter` /
+`UParticleModule::PostEditChangeProperty`) and Cascade. Cooking only loads and saves, so the cooked data goes through
+unchanged. Packages without the marker build as before; the check doesn't even create a metadata object for them. In
+Cascade, edits to a marked GPU emitter don't change its simulation data.
 
 **Checking your build.** It's worth doing before you make anything. This compares the uniform buffers your editor
 builds with the game's (`pip install pefile capstone` first):

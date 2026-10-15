@@ -1,0 +1,298 @@
+{
+ "format": "hashpatch/1",
+ "files": [
+  {
+   "path": "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+   "sha256": "67593870e20952bf792f69a213f4aa1c77c0da74916c102493e886f62150cbc7",
+   "edits": [
+    {
+     "line": 26,
+     "remove": [],
+     "add": [
+      {
+       "text": "#include \"UObject/MetaData.h\""
+      },
+      {
+       "text": "#include \"UObject/LinkerLoad.h\""
+      }
+     ]
+    },
+    {
+     "line": 1662,
+     "remove": [],
+     "add": [
+      {
+       "text": "// ITR: a particle system imported from cooked data carries the package metadata marker \"ItrKeepCookedParticleBuild\""
+      },
+      {
+       "text": "// (package-level RootMetaDataMap, or on the object or one of its outers). Its Distribution objects are stripped, so"
+      },
+      {
+       "text": "// CompileModules would crash, and a GPU emitter's cooked EmitterInfo / ResourceData must stay as cooked. With the marker,"
+      },
+      {
+       "text": "// Build does what a cooked game's Build does. Unmarked packages get no metadata object created (no UPackage::GetMetaData)."
+      },
+      {
+       "text": "// Also used by UParticleModuleTypeDataGpu::Build."
+      },
+      {
+       "text": "bool ItrKeepCookedParticleBuild(const UObject* Object)"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        161
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        353
+       ]
+      },
+      {
+       "text": "\tstatic const FName MarkerName(TEXT(\"ItrKeepCookedParticleBuild\"));"
+      },
+      {
+       "text": "\tUPackage* Package = Object ? Object->GetOutermost() : nullptr;"
+      },
+      {
+       "text": "\tUMetaData* MetaData = Package ? FindObjectFast<UMetaData>(Package, FName(NAME_PackageMetaData)) : nullptr;"
+      },
+      {
+       "text": "\tif (MetaData && MetaData->HasAnyFlags(RF_NeedLoad) && IsInGameThread() && MetaData->GetLinker())"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        192
+       ]
+      },
+      {
+       "text": "\t\tMetaData->GetLinker()->Preload(MetaData);"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        195
+       ]
+      },
+      {
+       "text": "\tif (!MetaData || MetaData->HasAnyFlags(RF_NeedLoad))"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        192
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        488
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        195
+       ]
+      },
+      {
+       "text": "\tif (MetaData->RootMetaDataMap.Contains(MarkerName))"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        192
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        1536
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        195
+       ]
+      },
+      {
+       "text": "\tfor (const UObject* Outer = Object; Outer; Outer = Outer->GetOuter())"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        192
+       ]
+      },
+      {
+       "text": "\t\tif (MetaData->HasValue(Outer, MarkerName))"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        212
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        1438
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        224
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        195
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        346
+       ]
+      },
+      {
+       "text": "#else"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        346
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        55
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        169
+       ]
+      },
+      {
+       "text": ""
+      }
+     ]
+    },
+    {
+     "line": 1675,
+     "remove": [
+      "e43d7c59821f42a69c67acba3ee4868aadba22b47ad941aceaf3225b46c0c947"
+     ],
+     "add": [
+      {
+       "text": "\t\t\t\tif(!GetOutermost()->bIsCookedForEditor && !ItrKeepCookedParticleBuild(this))\t// ITR"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Private/Particles/ParticleModules.cpp",
+   "sha256": "8773ad404f11fe93103b43be4642483e5398b03c7041bd0779407913b3bc0706",
+   "edits": [
+    {
+     "line": 4566,
+     "remove": [],
+     "add": [
+      {
+       "text": "bool ItrKeepCookedParticleBuild(const UObject* Object);\t// ITR: ParticleComponents.cpp"
+      },
+      {
+       "text": ""
+      }
+     ]
+    },
+    {
+     "line": 4574,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t// ITR: imported cooked data: keep the cooked EmitterInfo / ResourceData (CompileModules was skipped, EmitterBuildInfo is"
+      },
+      {
+       "text": "\t// empty) and only create or update the GPU resources from them, as a cooked game's Build does."
+      },
+      {
+       "text": "\tif (ItrKeepCookedParticleBuild(this))"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        192
+       ]
+      },
+      {
+       "text": "\t\tif (EmitterInfo.Resources)"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        212
+       ]
+      },
+      {
+       "text": "\t\t\tBeginUpdateGPUSpriteResources(EmitterInfo.Resources, ResourceData);"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        224
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        423
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        212
+       ]
+      },
+      {
+       "text": "\t\t\tEmitterInfo.Resources = BeginCreateGPUSpriteResources(ResourceData);"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        224
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        659
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Particles/ParticleComponents.cpp",
+        195
+       ]
+      },
+      {
+       "text": ""
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

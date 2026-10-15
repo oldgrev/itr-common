@@ -1,0 +1,600 @@
+{
+ "format": "hashpatch/1",
+ "files": [
+  {
+   "path": "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+   "sha256": "1029053b947616402e51302e081c6dd1f9e40bdb30fd07c9d2466448b5e3feeb",
+   "edits": [
+    {
+     "line": 1290,
+     "remove": [],
+     "add": [
+      {
+       "text": ""
+      },
+      {
+       "text": "\t// ITR: bShouldDoForwardSSR override (FMaterialInstanceBasePropertyOverrides::bOverride_ShouldDoForwardSSR / bShouldDoForwardSSR)"
+      },
+      {
+       "text": "\tTSharedPtr<IPropertyHandle> ShouldDoForwardSSRProperty = BasePropertyOverridePropery->GetChildHandle(\"bShouldDoForwardSSR\");"
+      },
+      {
+       "text": "\tif (ShouldDoForwardSSRProperty.IsValid())"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        71
+       ]
+      },
+      {
+       "text": "\t\tTAttribute<bool> IsOverrideShouldDoForwardSSREnabled = TAttribute<bool>::Create(TAttribute<bool>::FGetter::CreateLambda([this]() {"
+      },
+      {
+       "text": "\t\t\treturn MaterialEditorInstance->BasePropertyOverrides.bOverride_ShouldDoForwardSSR != 0;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        1267
+       ]
+      },
+      {
+       "text": "\t\tFIsResetToDefaultVisible IsShouldDoForwardSSRPropertyResetVisible = FIsResetToDefaultVisible::CreateLambda([this](TSharedPtr<IPropertyHandle> InHandle) {"
+      },
+      {
+       "text": "\t\t\treturn MaterialEditorInstance->Parent != nullptr ? (MaterialEditorInstance->BasePropertyOverrides.bShouldDoForwardSSR != 0) != UMaterialInstance::GetShouldDoForwardSSR(MaterialEditorInstance->Parent) : false;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        1270
+       ]
+      },
+      {
+       "text": "\t\tFResetToDefaultHandler ResetShouldDoForwardSSRPropertyHandler = FResetToDefaultHandler::CreateLambda([this](TSharedPtr<IPropertyHandle> InHandle) {"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        1272
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        290
+       ]
+      },
+      {
+       "text": "\t\t\t\tMaterialEditorInstance->BasePropertyOverrides.bShouldDoForwardSSR = UMaterialInstance::GetShouldDoForwardSSR(MaterialEditorInstance->Parent);"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        306
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        1270
+       ]
+      },
+      {
+       "text": "\t\tFOnBooleanValueChanged OnOverrideShouldDoForwardSSRChanged = FOnBooleanValueChanged::CreateLambda([this](bool NewValue) {"
+      },
+      {
+       "text": "\t\t\tMaterialEditorInstance->BasePropertyOverrides.bOverride_ShouldDoForwardSSR = NewValue;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        1279
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        1280
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        1270
+       ]
+      },
+      {
+       "text": "\t\tIDetailPropertyRow& ShouldDoForwardSSRPropertyRow = BasePropertyOverrideGroup.AddPropertyRow(ShouldDoForwardSSRProperty.ToSharedRef());"
+      },
+      {
+       "text": "\t\tShouldDoForwardSSRPropertyRow"
+      },
+      {
+       "text": "\t\t\t.DisplayName(ShouldDoForwardSSRProperty->GetPropertyDisplayName())"
+      },
+      {
+       "text": "\t\t\t.ToolTip(ShouldDoForwardSSRProperty->GetToolTipText())"
+      },
+      {
+       "text": "\t\t\t.EditCondition(IsOverrideShouldDoForwardSSREnabled, OnOverrideShouldDoForwardSSRChanged)"
+      },
+      {
+       "text": "\t\t\t.Visibility(TAttribute<EVisibility>::Create(TAttribute<EVisibility>::FGetter::CreateSP(this, &FMaterialInstanceParameterDetails::IsOverriddenAndVisible, IsOverrideShouldDoForwardSSREnabled)))"
+      },
+      {
+       "text": "\t\t\t.OverrideResetToDefault(FResetToDefaultOverride::Create(IsShouldDoForwardSSRPropertyResetVisible, ResetShouldDoForwardSSRPropertyHandler));"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        73
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Editor/UnrealEd/Private/PreviewMaterial.cpp",
+   "sha256": "312a96efe50a6d574618672f30c7e318fca2abc5596d3fafd865b86bd56a6570",
+   "edits": [
+    {
+     "line": 1812,
+     "remove": [],
+     "add": [
+      {
+       "text": "\tif (!BasePropertyOverrides.bOverride_ShouldDoForwardSSR)\t// ITR"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        71
+       ]
+      },
+      {
+       "text": "\t\tBasePropertyOverrides.bShouldDoForwardSSR = SourceInstance->ShouldDoForwardSSR();"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        73
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Classes/Materials/Material.h",
+   "sha256": "ebdf67e1c9c27d5d467f99adb5f8025c0dd3d0946d1cf81b08572c85651331b5",
+   "edits": [
+    {
+     "line": 784,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t/* ITR: forward renderer screen space reflections (same name and serialization as Into the Radius 2.7.2's engine). Material instances can override it (FMaterialInstanceBasePropertyOverrides::bShouldDoForwardSSR); the effective value is MATERIAL_SHOULD_DO_FORWARD_SSR in the shader environment. */"
+      },
+      {
+       "text": "\tUPROPERTY(EditAnywhere, BlueprintReadOnly, Category = ForwardShading, meta = (DisplayName = \"Screen Space Reflections (Forward)\"))"
+      },
+      {
+       "text": "\tuint8 bScreenSpaceReflectionsForward : 1;"
+      },
+      {
+       "text": ""
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstance.h",
+   "sha256": "ecd659159d1f59ce437f631e1f85ca09f053b8b50b6992f50695f5ac106e5425",
+   "edits": [
+    {
+     "line": 363,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t/** ITR: cached bShouldDoForwardSSR (BasePropertyOverrides.bShouldDoForwardSSR when overridden, else the parent's). */"
+      },
+      {
+       "text": "\tuint8 bShouldDoForwardSSR : 1;"
+      }
+     ]
+    },
+    {
+     "line": 558,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t/** ITR: the forward screen space reflections flag this instance compiles with. */"
+      },
+      {
+       "text": "\tENGINE_API bool ShouldDoForwardSSR() const;"
+      },
+      {
+       "text": "\t/** ITR: forward SSR flag of any material interface (a material's bScreenSpaceReflectionsForward, an instance's ShouldDoForwardSSR()). */"
+      },
+      {
+       "text": "\tENGINE_API static bool GetShouldDoForwardSSR(const UMaterialInterface* Material);"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Classes/Materials/MaterialInstanceBasePropertyOverrides.h",
+   "sha256": "5b234e66a21416df2be5998fcddf3419b98131dd45e19cdacf673a3abc6361ac",
+   "edits": [
+    {
+     "line": 44,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t/** ITR: enables override of forward screen space reflections (same name and serialization as Into the Radius 2.7.2's engine). */"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/Material.h",
+        866
+       ]
+      },
+      {
+       "text": "\tuint8 bOverride_ShouldDoForwardSSR : 1;"
+      },
+      {
+       "text": ""
+      }
+     ]
+    },
+    {
+     "line": 59,
+     "remove": [],
+     "add": [
+      {
+       "text": ""
+      },
+      {
+       "text": "\t/** ITR: whether the material does forward screen space reflections (UMaterial::bScreenSpaceReflectionsForward per instance: MATERIAL_SHOULD_DO_FORWARD_SSR). */"
+      },
+      {
+       "text": "\tUPROPERTY(EditAnywhere, Category = Material, meta = (editcondition = \"bOverride_ShouldDoForwardSSR\"))"
+      },
+      {
+       "text": "\tuint8 bShouldDoForwardSSR : 1;"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+   "sha256": "40468696087707e1b2831359ad2e3acf2029f12a5efc903bbbc22120497db647",
+   "edits": [
+    {
+     "line": 2696,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t\tbShouldDoForwardSSR = 0;"
+      }
+     ]
+    },
+    {
+     "line": 2789,
+     "remove": [],
+     "add": [
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        73
+       ]
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "\t// ITR: same pattern as bFullyRough"
+      },
+      {
+       "text": "\tif (BasePropertyOverrides.bOverride_ShouldDoForwardSSR)"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        71
+       ]
+      },
+      {
+       "text": "\t\tbShouldDoForwardSSR = BasePropertyOverrides.bShouldDoForwardSSR != 0;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        73
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        172
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        71
+       ]
+      },
+      {
+       "text": "\t\tbShouldDoForwardSSR = GetShouldDoForwardSSR(Parent);"
+      },
+      {
+       "text": "\t\tBasePropertyOverrides.bShouldDoForwardSSR = bShouldDoForwardSSR;"
+      }
+     ]
+    },
+    {
+     "line": 4430,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t// ITR: bShouldDoForwardSSR override (changes MATERIAL_SHOULD_DO_FORWARD_SSR, so it must key the shader map)"
+      },
+      {
+       "text": "\tbool bUsedShouldDoForwardSSR = ShouldDoForwardSSR();"
+      },
+      {
+       "text": "\tif (bUsedShouldDoForwardSSR != (Mat->bScreenSpaceReflectionsForward != 0))"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        71
+       ]
+      },
+      {
+       "text": "\t\tconst FString HashString = TEXT(\"bOverride_ShouldDoForwardSSR\");"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+        4373
+       ]
+      },
+      {
+       "text": "\t\tHash.Update((uint8*)&bUsedShouldDoForwardSSR, sizeof(bUsedShouldDoForwardSSR));"
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+        4375
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        73
+       ]
+      }
+     ]
+    },
+    {
+     "line": 4448,
+     "remove": [
+      "550bfa1021fcf0f9c13b2d460f35321119dafb0eb84c604d7bb57adc1bd86415"
+     ],
+     "add": [
+      {
+       "text": "\t\t(IsFullyRough() != GetFullyRough(Parent)) ||"
+      },
+      {
+       "text": "\t\t(ShouldDoForwardSSR() != GetShouldDoForwardSSR(Parent))"
+      }
+     ]
+    },
+    {
+     "line": 4501,
+     "remove": [],
+     "add": [
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        73
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Classes/Materials/Material.h",
+        126
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        59
+       ]
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "bool UMaterialInstance::ShouldDoForwardSSR() const"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        57
+       ]
+      },
+      {
+       "text": "\treturn bShouldDoForwardSSR;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        59
+       ]
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "bool UMaterialInstance::GetShouldDoForwardSSR(const UMaterialInterface* InMaterial)"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        57
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+        4494
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        71
+       ]
+      },
+      {
+       "text": "\t\treturn Instance->ShouldDoForwardSSR();"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        73
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Runtime/Engine/Private/Materials/MaterialInstance.cpp",
+        4498
+       ]
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        71
+       ]
+      },
+      {
+       "text": "\t\treturn BaseMaterial->bScreenSpaceReflectionsForward != 0;"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Private/Materials/MaterialShared.cpp",
+   "sha256": "e628fd6514363f4eb4181e9b0e836da3f14a460e76363dd6a4b82d49735ce261",
+   "edits": [
+    {
+     "line": 1364,
+     "remove": [],
+     "add": [
+      {
+       "text": "bool FMaterialResource::ShouldDoForwardSSR() const"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        57
+       ]
+      },
+      {
+       "text": "\t// ITR: instance override (FMaterialInstanceBasePropertyOverrides::bShouldDoForwardSSR), else UMaterial::bScreenSpaceReflectionsForward"
+      },
+      {
+       "text": "\treturn MaterialInstance ? MaterialInstance->ShouldDoForwardSSR() : Material->bScreenSpaceReflectionsForward != 0;"
+      },
+      {
+       "ref": [
+        "Engine/Source/Editor/MaterialEditor/Private/MaterialEditorInstanceDetailCustomization.cpp",
+        59
+       ]
+      },
+      {
+       "text": ""
+      }
+     ]
+    },
+    {
+     "line": 1953,
+     "remove": [],
+     "add": [
+      {
+       "text": "\tOutEnvironment.SetDefine(TEXT(\"MATERIAL_SHOULD_DO_FORWARD_SSR\"), ShouldDoForwardSSR());\t// ITR"
+      }
+     ]
+    },
+    {
+     "line": 4016,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t,bOverride_ShouldDoForwardSSR(false)"
+      }
+     ]
+    },
+    {
+     "line": 4020,
+     "remove": [],
+     "add": [
+      {
+       "text": "\t,bShouldDoForwardSSR(0)"
+      }
+     ]
+    },
+    {
+     "line": 4040,
+     "remove": [
+      "afb4e90e9930c521de562fc3474182141208d721f1ac41780d6c4830de152554"
+     ],
+     "add": [
+      {
+       "text": "\t\t\tbFullyRough == Other.bFullyRough &&"
+      },
+      {
+       "text": "\t\t\tbOverride_ShouldDoForwardSSR == Other.bOverride_ShouldDoForwardSSR &&"
+      },
+      {
+       "text": "\t\t\tbShouldDoForwardSSR == Other.bShouldDoForwardSSR;"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Public/MaterialShared.h",
+   "sha256": "5c4783c16bbbf6897dd1ea91e5e6db1d6a6709c6fcb65238c4419c1c24f4264e",
+   "edits": [
+    {
+     "line": 1693,
+     "remove": [],
+     "add": [
+      {
+       "text": "\tvirtual bool ShouldDoForwardSSR() const { return false; }\t// ITR"
+      }
+     ]
+    },
+    {
+     "line": 2554,
+     "remove": [],
+     "add": [
+      {
+       "text": "\tENGINE_API virtual bool ShouldDoForwardSSR() const override;\t// ITR"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
