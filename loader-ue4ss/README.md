@@ -173,7 +173,9 @@ config refers to would be collected and later crash the loot roll. So:
   (class `BP_<Name>_LootTables_C`, or `LootHolderClass`);
 - while the map's level is loaded the entries point at your tables, and before it goes they point back at the donor tables.
 
-A map without loot nodes needs no manifest, and the example map has none.
+A map without loot nodes needs no manifest, and the example map has none. `Scripts/Example.loot.example.json` is a sample
+manifest with both forms (a donor-only tag, and a tag with its own table). The loader ignores it; copy it to
+`Scripts/<Name>.loot.json` and edit it for your map.
 
 ## Limits
 - One native map per loader. To load several maps, copy the `ITRMapLoader` folder under another name (for example

@@ -1,0 +1,20 @@
+{
+ "version": 1,
+ "doc": "Sample loot manifest. The loader does not read this file. To use it for your map, copy it to Scripts/<Name>.loot.json, where <Name> is the map's Name in config.lua (Example.loot.json for the example map), or point Map.LootManifest at it. JSON has no comments, so every 'doc' field here is just text and is ignored.",
+ "tags": [
+  {
+   "doc": "Simplest form: a new tag that borrows a stock donor tag's loot table. loot_points is this tag's own budget. Without table_asset it rolls the donor's table, so its used points are shared with the donor zone.",
+   "tag": "Loot.Example.Ammo",
+   "source_tag": "Loot.Buffer.TrainStation.Ammo",
+   "loot_points": 20
+  },
+  {
+   "doc": "With your own DataTable, cooked into the map pak. table_asset is the full object path. table_name must match the name of that table in the Tables array of the map's holder actor (BP_<Name>_LootTables_C, or LootHolderClass in config.lua), which keeps the table loaded. While the map is loaded the tag rolls your table; at other times it points back at the donor table.",
+   "tag": "Loot.Example.Stash.Grey",
+   "source_tag": "Loot.Factory.Stash.Grey_Exist",
+   "loot_points": 12,
+   "table_name": "DT_Loot_Example_Stash_Grey",
+   "table_asset": "/Game/Mods/Example/Loot/DT_Loot_Example_Stash_Grey.DT_Loot_Example_Stash_Grey"
+  }
+ ]
+}
