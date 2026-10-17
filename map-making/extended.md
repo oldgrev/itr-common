@@ -19,11 +19,17 @@ real ones and repeatable. **Offline** means we checked files or ran tools, never
 - We generated a C++ SDK with Dumper-7. Our code runs on the game thread from a `ProcessEvent` hook, about 20 times a
   second.
 - A UE4SS Lua mod can do most of this too, since nearly all of it is UFunction calls. Our map loader is a UE4SS
-  script and works in VR ([`loader-ue4ss/`](../loader-ue4ss/)). Watch out for functions with non-struct
+  script and works in VR (native mode) ([`loader-ue4ss/`](../loader-ue4ss/)). Watch out for functions with non-struct
   out-parameters though, UE4SS 3.0.1 gets the arguments after them wrong.
 
 ## Getting the player onto the map (VR)
-Stream the level in at zero offset with `ULevelStreamingDynamic::LoadLevelInstance`, then `K2_TeleportTo` the player
+The recommended way is the loader's native mode: it registers the map as a game level (a streaming entry, a level-table row
+and a map centre, all at runtime) and enters it with the game mode's `TransferToLevel`, so the game itself runs the
+transition, the Hub unload and the level start events described below. Everything in this file that says "by hand" is what
+the streaming mode, the fallback, has to do because the game doesn't know the map is a level. See
+[`loader-ue4ss/`](../loader-ue4ss/) and [`guide.md`](guide.md) §6.
+
+The streaming way: stream the level in at zero offset with `ULevelStreamingDynamic::LoadLevelInstance`, then `K2_TeleportTo` the player
 pawn to a tagged `TargetPoint`. Do it from the Hub. From the main menu the teleport says it worked, but the VR player
 stays where they are. The game has `IPRPlayerCharacter::TeleportPlayer`, but it's a native event with no UFunction
 on the player class, and calling it through a generated interface wrapper crashes on a null pointer. The full recipe

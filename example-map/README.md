@@ -4,6 +4,10 @@ A small test map for Into the Radius 1 (2.7.2). It's an 80 m floor with a checke
 hut, and a ramp up to a platform. It has a sky dome and Movable lights, a start marker, navmesh, and an exit pad about
 8 m to the left of where you start, which takes you back to the Hub.
 
+It is also the map the [loader](../loader-ue4ss/) is configured for out of the box. In the Hub, pick up the **sugar cube**
+(the item with the static mesh `SM_Tea01D`) and you go through the game's transition onto this map; step on the exit pad
+and you come back to the Hub the same way.
+
 The floor uses `M_ExampleGrid`, a material your editor compiles, so it doubles as a check that your special editor
 works. Built with the special editor, the checker shows up in game. Built with stock 4.27, the game would crash or
 draw it black. If you only have stock 4.27, set `OWN_MATERIAL = False` in `Scripts/build_example.py` and it'll stick
@@ -40,7 +44,7 @@ loader and the pak are at the top of [the main README](../README.md#example-map-
    ```powershell
    .\build-map.ps1 -Engine "C:\ue427\Engine" -Install
    ```
-6. Load it with the [loader](../loader-ue4ss/). You need to be in the Hub.
+6. Load it with the [loader](../loader-ue4ss/): grab the sugar cube in the Hub (or press F10, the loader's default key).
 
 To turn it into your own map, change `FOLDER`, `HOST` and `MAP` at the top of both scripts (or just build in the
 editor by hand), and pass `-Map <Name>` to `build-map.ps1`.
@@ -51,3 +55,37 @@ editor by hand), and pass `-Map <Name>` to `build-map.ps1`.
 - In VR, loaded from the Hub with the UE4SS script: the checker floor looks right, you land on the start marker, three
   enemies we spawned 40 m away stood on the navmesh, and the exit pad took us back to the Hub and unloaded the map.
 - We haven't tried building it with stock 4.27.2 (`OWN_MATERIAL = False`).
+
+## What a map needs for native entry
+The example is entered natively (the loader registers it as a game level, then uses the game's level transfer). The map
+itself needs very little for that, and everything the example has is already there:
+- **A start marker:** a `TargetPoint` tagged `itr:player_start` (the example puts it 30 m from the middle of the map,
+  8 m from the exit pad). The loader moves you there if the game puts you more than 30 m away.
+- **An exit:** a `TargetPoint` tagged `itr:exit`, with a visible pad and post on it. Standing within 1.5 m of it takes you
+  back to the Hub. Add `itr:exit_id:<ID>` to remember which exit you used, and a `TargetPoint` tagged `itr:arrive:<ID>` a few
+  metres in front of it to arrive there next time.
+- **The level's name:** the world is called `L_Example`, the `.umap` name. The loader registers that name as the level's main
+  sublevel, so it must match the last part of `Level` in the config.
+- **Built where it sits:** the map is built at world position (0, -600000, 0), clear of the game's navmesh volumes. The
+  config's `NativeCenter` and `NativeStart` use those world coordinates.
+- Nothing else: no gates, no level blueprint, no game mode, no save data. Loot and spawners are optional (see the loader README).
+
+What the modder adds is the loader's `config.lua` entry. For this map:
+
+```lua
+{
+    Name = "Example",
+    Level = "/Game/Mods/Example/L_Example",
+    StartTag = "itr:player_start",
+    Native = true,
+    DisplayName = "Example",
+    NativeDonorTag = "Level.Zone.Buffer",                 -- a stock zone whose level rules are copied
+    NativeSaves = false,                                  -- no save is written inside the map
+    NativeRadius = 50000,
+    NativeCenter = { X = 0, Y = -600000, Z = 0 },         -- the middle of the map, in world cm
+    NativeStart = { X = -3000, Y = -600000, Z = 20, Yaw = 0 },   -- the itr:player_start marker
+    NativeTriggerMesh = "SM_Tea01D",                      -- grab this Hub item to enter
+}
+```
+To make your own map, change the folder, `Name`, `Level`, the centre and the start to your map's, and pick a Hub item that
+no other loader uses (the loader README lists each field and a few Hub items).

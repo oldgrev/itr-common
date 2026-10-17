@@ -1,53 +1,27 @@
 # ITRMapLoader (UE4SS Lua)
 
-A small UE4SS script that gets you into a custom map in Into the Radius 1 (2.7.2) and back out again. The game
-can't load custom maps yet, so you need something like this to get into one.
+A UE4SS script that gets you into a custom map in Into the Radius 1 (2.7.2) and back out again. The game has no way
+to load a custom map by itself, so you need something like this to get into one.
 
-When you arrive in the Hub (or press a key), it streams your map in and moves you to the map's start marker. When
-you step on one of the map's exit markers, it takes you back to the Hub and unloads the map.
+It registers your map with the game as a **level**, the way zones are, and then enters it through the
+game's level transfer, the call a zone gate makes. You get the normal transition screen, the Hub unloading, the level
+start events, loot and the arrival, and you leave the same way. This is the **native mode** and it is the default. The
+older mode, which streams the map in next to the Hub, is still in the script as a fallback (see "Streaming mode").
 
-A copy of this loader configured for a large map (with its loot manifest, `AutoLoadInHub`) is in
-[`itr-showcase/loader`](../../itr-showcase/loader/).
+As provided, this loader is set up for the [example map](../example-map/): in the Hub, pick up the sugar cube, and you are
+on the example map. Step on its return pad and you are back in the Hub.
 
-## What's new (untested in Lua)
-The Hub teardown, multiple exits, the re-entry memory, gameplay activation and loot registration were added after the
-testing described below. **None of the new parts of this Lua loader have been run through a Hub load yet.** They are
-ports of what our C++ mod (aiMod) does. aiMod's versions of the Hub teardown, the exit through the game's Hub load,
-and the gameplay activation have since passed our `-nohmd` harness runs (an automated game run with scripted checks, see
-[`extended.md`](../map-making/extended.md)), but not VR. The loot registration passed the harness too, in aiMod's C++
-form. What has been seen of the Lua one: with UE4SS installed in the standard layout (below), alongside aiMod, a
-`-nohmd` launch started the loader and `UE4SS.log` showed `[ITRMapLoader] ready: 1 map(s); ...`. A run that loads the map
-through Lua hasn't happened yet.
-- **Hub teardown.** While a map is loaded, all of the Hub's streaming levels are unloaded (see "Why the Hub teardown
-  exists" at the end). On by default; `HubTeardown = false` brings back the old behaviour.
-- **Multiple exits.** Any number of `TargetPoint`s tagged `itr:exit` work. An exit can also carry an id.
-- **Re-entry memory.** The loader remembers which exit (by id) you left through, and next time puts you at the
-  matching arrive marker.
+A second loader configured for a large map, with its loot manifest, is in [`itr-showcase/loader`](../../itr-showcase/loader/).
+Both can be installed at the same time (see "Several maps").
 
-- **Gameplay activation.** About 3 s after you arrive, the map's gameplay actors (loot points, stashes, anomalies,
-  monster spawners and generators; everything that derives from `PRBasicActor`) are sent the level-start events the
-  game only fires for levels it loads itself. Without it, a streamed map's spawners, loot and anomalies sit idle.
-  Port of what aiMod does (the harness-tested C++ version; [`extended.md`](../map-making/extended.md) has the write-up), untested in this loader. See "Gameplay activation".
+## What was tested
+The native mode with the showcase map, in VR (UE4SS 3.0.1, October 2026): picking up a Hub item ran the game's
+transition, the arrival on the map had its loot, and the map's return pad took us back to the Hub through the same
+transition. The example map has not been entered natively yet; the first run is the next test.
 
-## What we've tested
-We tested the original loader (map entry, one exit marker, no teardown) in October 2026 with UE4SS 3.0.1 and the
-[example map](../example-map/):
-- In VR (SteamVR), installed the way the Nexus page describes: the map loaded about 7 s after the Hub finished
-  loading, we were moved to the start, enemies we spawned stood on the navmesh, and the exit pad took us back and
-  unloaded the map.
-- We got the same result with our first install layout (see the end of the install section).
-- It runs fine next to a mod that uses an `XINPUT1_3.dll` proxy.
-
-Not tested yet:
-- Everything under "What's new". In particular, whether `LevelManager::LoadLevel(Level.Hub)` called from Lua behaves
-  as it does in aiMod, and whether `GetMovementBase` works on the VR pawn (the loader falls back to comparing
-  positions if it doesn't).
-- The F7 key. It calls the same load and unload code, so it should be fine.
-- Going into the Hub with the menu's Continue button. Our test used a shortcut into the Hub, and the script waits
-  for the game's level manager to say it's ready, so Continue should work the same way.
-- Installing UE4SS through Vortex. The mod page says the ITR extension expects this exact build.
-- On desktop (`-nohmd`) the auto-load never fires. In that mode the game doesn't seem to finish moving you into the
-  Hub, so the level manager never reports ready. It isn't a real way to play anyway.
+Not tested: the streaming mode's Hub teardown, multiple exits and re-entry memory beyond what its section says,
+UE4SS installed through Vortex, a desktop `-nohmd` start (the game never reports the Hub as ready there, so nothing
+triggers).
 
 ## Installing
 1. **UE4SS.** We used "UE4SS for ITR1" from Nexus Mods (https://www.nexusmods.com/intotheradiusvr/mods/359), a
@@ -60,63 +34,94 @@ Not tested yet:
    - in `Paks`, rename `Mods` to `LuaMods`. This build's `UE4SS-settings.ini` has `ModsFolderPath = ./LuaMods`, and
      if you skip the rename, `UE4SS.log` shows a `directory_iterator` error and no Lua mods start at all.
 
-   Our first layout also worked: `dwmapi.dll` and the whole `ue4ss` folder in `Binaries\Win64`, no `override.txt`,
-   and `Mods` renamed to `LuaMods` inside the `ue4ss` folder.
+   **The standard UE4SS 3 layout** works too: `dwmapi.dll` and the release's `ue4ss\` folder (with `UE4SS.dll`,
+   `UE4SS-settings.ini` and `Mods\` inside) both go next to `IntoTheRadius-Win64-Shipping.exe` in `Binaries\Win64`.
+   There is no `override.txt`, nothing in `Content\Paks`, and `Mods` keeps its name. Put the loader in `ue4ss\Mods\`
+   instead of `LuaMods`. In that layout `Mods\mods.txt` also needs the line `ITRMapLoader : 1`. Don't install both layouts at once.
 
-   **The standard UE4SS 3 layout** is another option, and it's what a plain UE4SS release is made for: `dwmapi.dll` and
-   the release's `ue4ss\` folder (with `UE4SS.dll`, `UE4SS-settings.ini` and `Mods\` inside) both go next to the
-   game's `IntoTheRadius-Win64-Shipping.exe` in `Binaries\Win64`. There's no `override.txt` and nothing in
-   `Content\Paks`, and `Mods` keeps its name. Put the loader in `ue4ss\Mods\` rather than `LuaMods`. Everything else
-   below applies, with those folder names swapped. We installed a UE4SS 3.0.1 build this way next to a mod that uses an
-   `XINPUT1_3.dll` proxy: the game started, `UE4SS.log` appeared inside `ue4ss\`, and the loader started. That's as far
-   as we've gone with it, a `-nohmd` start only. Not tried in VR. Don't install both layouts at once.
-2. Copy the `ITRMapLoader` folder into `LuaMods` (or `ue4ss\Mods` in the standard layout). The empty `enabled.txt` inside it turns it on, so you don't need to
-   touch `mods.txt`.
-3. Edit `ITRMapLoader\Scripts\config.lua`:
-   - `Maps` lists your maps (a name, the level path, and the start tag);
-   - `AutoLoadInHub` is the map to load when you get to the Hub, which is what you want in VR;
-   - `Key` is the keyboard key, F7 by default;
-   - `ExitTag` is the exit marker's tag, `itr:exit` by default.
+   **If the game hangs at startup** (no window, around 12 MB of memory), there is a hidden "UE4SS Error: Failed to load
+   UE4SS.dll" message box behind it: `UE4SS.dll` isn't where `override.txt` points. Usually the `ue4ss` folder itself
+   was copied into `Paks` instead of what is inside it.
+2. Copy the `ITRMapLoader` folder into `LuaMods` (or `ue4ss\Mods`). The empty `enabled.txt` inside turns it on.
+3. Put your map's pak in `<game>\IntoTheRadius\Content\Paks\` (for the example: `zzz_ITRMap_Example_P.pak`).
+4. Edit `ITRMapLoader\Scripts\config.lua` (below), start the game and Continue into the Hub.
 
-   The rest are optional, and the defaults are in `config.lua`. `HubTeardown`, `ReEntry` and `ExitRadius` can also be
-   set on a single map entry, which overrides the global value.
+To uninstall, delete `dwmapi.dll`, `override.txt`, the UE4SS files you copied, and the map's pak.
 
-   | Key | Default | What it does |
-   |---|---|---|
-   | `ExitIdTagPrefix` | `"itr:exit_id:"` | prefix of the tag that gives an exit its id |
-   | `ExitRadius` | `150` | how close (cm, horizontal) you must stand to an exit to use it |
-   | `ReEntry` | `true` | remember the last exit id per map and arrive at the matching arrive marker |
-   | `ArriveTagPrefix` | `"itr:arrive:"` | prefix of the arrive markers' tags |
-   | `ReEntryFile` | `nil` | where the memory is kept; `nil` means `reentry.txt` next to `main.lua` |
-   | `HubTeardown` | `true` | unload the Hub's streaming levels while the map is loaded |
-   | `StagingMaxWestX` | `-20000` | the staging point must have a world X greater than this (cm) |
-   | `HubLevelTag` | `"Level.Hub"` | the gameplay tag the exit asks the game to load |
-   | `ActivateGameplay` | `true` | send the map's gameplay actors the level-start events (see "Gameplay activation") |
-   | `LootRetagShim` | `false` | dev only, see "Gameplay activation" |
-   | `RequireLevelManagerReady` | `true` | `false` only for desktop `-nohmd` test runs |
+## Registering your own map
+Everything that belongs to one map is in `config.lua`. `main.lua` holds no map names, tags, positions or triggers. Copy
+the `Maps` entry and change it:
 
-**If the game hangs at startup** (no window, around 12 MB of memory), there's a hidden "UE4SS Error: Failed to load
-UE4SS.dll" message box behind it. It means `UE4SS.dll` isn't where `override.txt` points. We did that the
-first time, by copying the `ue4ss` folder itself into `Paks` (so it ended up at `Paks\ue4ss\UE4SS.dll`) instead of
-what's inside it.
+```lua
+Maps = { {
+    Name = "MyMap",                          -- short name; also picks the loot manifest file
+    Level = "/Game/Mods/MyMap/L_MyMap",      -- the cooked level package
+    StartTag = "itr:player_start",           -- tag of the TargetPoint you arrive at
+    Native = true,
+    NativeTag = "Level.Zone.MyMap",          -- the level's gameplay tag (this is the default)
+    DisplayName = "My Map",
+    NativeDonorTag = "Level.Zone.Buffer",
+    NativeSaves = false,
+    NativeCenter = { X = 0, Y = -600000, Z = 0 },
+    NativeStart = { X = -3000, Y = -600000, Z = 20, Yaw = 0 },
+    NativeTriggerMesh = "SM_Tea01D",
+} },
+Key = "F10",
+```
 
-To uninstall, delete `dwmapi.dll`, `override.txt` and the UE4SS files you copied (`UE4SS.dll`,
-`UE4SS-settings.ini`, `LuaMods`, `LogicMods` and so on).
+### What each field means
+| Field | Default | Meaning |
+|---|---|---|
+| `Name` | required | Short name. Names the map in the log and picks the loot manifest `Scripts/<Name>.loot.json`. |
+| `Level` | required | Package path of the cooked level under `/Game/Mods/`. Its last part is the world's name, and must match the `.umap` file name. |
+| `StartTag` | `itr:player_start` in the examples | Actor tag of the `TargetPoint` where you arrive. |
+| `Native` | `true` | `true`: register as a game level and use the level transfer. `false`: the streaming mode. |
+| `NativeTag` | `Level.Zone.<Name>` | The level's gameplay tag. Must be unique. |
+| `NativeSublevel` | last part of `Level` | The level's main sublevel: the map's world name. Leave it. |
+| `DisplayName` | `Name` | The level name the game shows. |
+| `NativeDonorTag` | `Level.Zone.Buffer` | A stock zone whose time, inventory, generator and map-scale settings are copied into the new level. |
+| `NativeSaves` | `false` | See "Saving". |
+| `NativeReloadOnTide` | `false` | `true` only once the map has its own tide actor. |
+| `NativeRadius` | `250000` | The level row's `MaxLevelRadius` in cm. |
+| `NativeCenter` | `0, 0, 0` | Where the map sits in the world (cm), for the handheld map and map points: the centre of your playable area. |
+| `NativeStart` | none | World position (cm) and yaw (degrees) the game puts you at on arrival. Use the start marker's position; without it the game searches for a `PlayerStart` and may pick another level's. |
+| `NativeArriveTolerance` | `3000` | If you arrive farther than this (cm) from the start (or arrive) marker, the loader moves you there. |
+| `NativeFallback` | `false` | `true`: if the registration fails, enter with the streaming mode instead. |
+| `NativeTriggerMesh` | none | Entry by Hub item: grabbing a Hub prop whose static mesh has this name enters the map. `SM_Tea01D` is the sugar cube. nil = no item trigger. |
+| `NativeTriggerFunction` | the Hub props' `OnGrip` | The grab event that is hooked for the item trigger. |
+| `ExitTag` | `ExitTag` below | A map can use its own exit tag. |
+| `NativeExitLocation` | none | A Hub gate's location tag to arrive at in the Hub; none = the Hub's `PlayerStart`. Can be set globally. |
+| `LootManifest` | `Scripts/<Name>.loot.json` | Path of the loot manifest (see "Loot"). |
+| `LootHolderClass` | `BP_<Name>_LootTables_C` | Class name of the actor in the map that keeps the map's loot tables alive. |
 
-## Using it
-- In VR, set `AutoLoadInHub = "Example"` (or whichever map name). Every time you go into the Hub the map loads once,
-  and a few seconds later you're on it. To leave, walk onto an exit marker (you need to be within about 1.5 m).
-- On a keyboard, F7 loads the next map in your list, and pressing it again takes you back and unloads it.
-- It never loads anything from the main menu.
-- `UE4SS.log` (next to `UE4SS.dll`) shows what it's doing. Look for lines starting with `[ITRMapLoader]`, like
-  `streaming ...`, `Hub teardown: ...`, `teleport to ...: true`, `exit marker(s)`, `exit marker reached`, `exit: ...`
-  and `unloaded <map>`. Every step of the teardown and the exit is logged.
+Global settings (outside `Maps`):
+| Field | Default | Meaning |
+|---|---|---|
+| `Key` | `"F10"` | A UE4SS key name that enters the map from the Hub and leaves it again. `false` = no key. |
+| `ConsoleCommand` | `"itrmap"` | A command for the game console, or for another mod through `ExecuteConsoleCommand`: `itrmap enter [MapName]`, `itrmap leave`. `false` = none. |
+| `LogTag` | `"ITRMapLoader"` | The prefix of this loader's lines in `UE4SS.log`. |
+| `ExitTag`, `ExitIdTagPrefix`, `ExitRadius` | `itr:exit`, `itr:exit_id:`, `150` | Exit markers (below). |
+| `TriggerFile` | none | Test hook: creating this file enters the first map once. |
+| `HubLevelTag` | `Level.Hub` | The level the exit transfers to. |
+| `RequireLevelManagerReady` | `true` | `false` only for desktop `-nohmd` test runs. |
+| `ReEntry`, `ArriveTagPrefix`, `ReEntryFile` | `true`, `itr:arrive:`, `reentry.txt` | Re-entry memory (below). |
 
-## If you're making a map
-- Put a `TargetPoint` tagged `itr:player_start` where people should arrive.
-- Put another `TargetPoint` tagged `itr:exit` where they can leave, and put something visible there so they can
-  find it. The example uses a small pad with a post.
-- Please don't skip the exit. Without one, people in VR are stuck until they quit to the menu.
+### Getting in
+A map can be entered three ways; use any of them.
+- **A Hub item.** Set `NativeTriggerMesh` to the name of a Hub prop's static mesh. Picking that item up starts the
+  transfer. The loader hooks `BP_PhysicsActor_C:OnGrip` and compares the grabbed actor's `Mesh`. It fires at most once
+  every 10 s, only in the Hub, and only once the map is registered. `SM_Tea01D` is the sugar cube; `SM_Pumice01` (a
+  pumice stone) is the only one of its kind in the Hub. Pick an item that only this loader uses.
+- **A key.** `Key` enters from the Hub and leaves from the map. The default F10 is one no common ITR mod uses; avoid F5
+  to F7 if you play with the Miyabi companion mod.
+- **A console command.** `itrmap enter` / `itrmap leave`. A command that names a map this loader doesn't have is left
+  for other handlers.
+
+### Getting out
+Put a `TargetPoint` tagged `itr:exit` in the map where people can leave, with something visible on it (the example uses a
+small pad with a post). Standing within `ExitRadius` of it takes you back to the Hub through the level transfer. The key
+and `itrmap leave` do the same. Please don't skip the exit: without one, people in VR are stuck until they quit to the menu.
+Leaving some other way (dying, a gate) is noticed, and the exits are disarmed.
 
 ### Tag conventions
 All of these go on `TargetPoint` actors in your map's level.
@@ -124,113 +129,98 @@ All of these go on `TargetPoint` actors in your map's level.
 | Tag | Meaning |
 |---|---|
 | `itr:player_start` | where people arrive when nothing is remembered (the map's `StartTag`) |
-| `itr:exit` | an exit. Standing within `ExitRadius` of it takes you back to the Hub. You can have as many as you like |
-| `itr:exit_id:<ID>` | gives that exit an id (for example `itr:exit_id:R2`), and leaving through it is remembered. A `TargetPoint` with only this tag is an exit too |
-| `itr:arrive:<ID>` | where you arrive when the last remembered exit was `<ID>`. Put it a few metres in front of that exit, not on it, or you'll leave again right away |
+| `itr:exit` | an exit. Standing within `ExitRadius` takes you back to the Hub. As many as you like |
+| `itr:exit_id:<ID>` | gives that exit an id (for example `itr:exit_id:R2`); leaving through it is remembered. A point with only this tag is an exit too |
+| `itr:arrive:<ID>` | where you arrive when the last remembered exit was `<ID>`. Put it a few metres in front of that exit, not on it, or you leave again right away |
 
-Re-entry works like this: you leave through the exit `itr:exit_id:R2`, and the loader writes `Example<TAB>R2` to
-`reentry.txt`. The next time the map loads (even after restarting the game), you arrive at `itr:arrive:R2` if the map
-has one. With no memory, an id the map has no arrive marker for, or `ReEntry = false`, you arrive at
-`itr:player_start`. Leaving by key, or through an exit without an id, doesn't change what's remembered. A missing or
-damaged `reentry.txt` is treated as empty (bad lines are skipped), and you can delete it to forget everything. If the
-loader can't write the file, it logs that once and carries on.
+Re-entry: you leave through `itr:exit_id:R2`, and the loader writes `<Name><TAB>R2` to `reentry.txt` next to
+`main.lua`. The next time the map loads, even after a game restart, you arrive at `itr:arrive:R2` if the map has one.
+Leaving by key, or through an exit without an id, changes nothing. Delete the file to forget; `ReEntry = false` turns it off.
 
-For the Hub teardown the map also needs at least one `TargetPoint` (any, preferably the arrive or exit ones) whose
-world X is greater than -20000, as a place to stand while the Hub unloads. If there isn't one, the teardown is
-skipped with a log line and you get the old behaviour.
+## What happens at startup (native mode)
+Once the game is idle in the Hub (or the menu), the loader adds, fail-safe and checked at each step:
+1. an unloaded, hidden **streaming entry** named after the map's world (`L_Example`) that points at your package;
+2. a **row in the level table** (`SystemConfig.LevelConfigurations`) under `NativeTag`. The flags are copied from the donor
+   zone, the tag is written last, and the loader checks that the earlier rows are unchanged and that the game accepts the tag;
+3. a **map centre** for the handheld map;
+4. the map's **loot tags** (see "Loot").
 
-## How it works
-Normally you'd call `LevelStreamingDynamic::LoadLevelInstance(World, Level, Location, Rotation, out bOutSuccess,
-OptionalLevelNameOverride)`. UE4SS 3.0.1 can't make that call from Lua, though. After a non-struct out-parameter
-like `bOutSuccess`, it leaves that parameter's table on the Lua stack, and the next argument gets read from the wrong
-place. You get `[push_strproperty] StrProperty can only be set to a string or FString` in the log, and if you pass a
-string where the out-parameter goes instead, it complains that "no table was on the stack".
+If a step fails, the log says why and entry stays off for the session (`NativeFallback = true` uses the streaming
+mode). Entering then calls the game mode's `TransferToLevel`. The details of how the game looks a level up are in the
+"Native level" comment block in `main.lua`.
 
-So the script does what `LoadLevelInstance` does internally:
-1. It calls `LevelStreaming::CreateInstance(<unique name>)` on an existing dynamic streaming entry, which makes a new
-   entry and adds it to the world.
-2. It sets that entry's `PackageNameToLoad` to your map's package.
-3. It sets `LevelTransform` to identity.
-4. It calls `SetShouldBeLoaded(true)` and `SetShouldBeVisible(true)`.
+## Saving
+By default (`NativeSaves = false`) the level's row turns off autosave, save-on-load, save-on-exit and sleeping. So no
+save file is written while you stand in the map, and no save ever names a level that exists only with the mod
+installed. What you did there (loot taken, spawner state, your inventory) is written by the Hub's autosave after you
+return. Quitting while inside the map loses that visit back to the last Hub save.
 
-Your level will show up with a name like `/Game/ITR/Levels/Hub/ITRMap_Example_1`. That's just the instance name;
-what actually gets loaded is your package.
+With `NativeSaves = true` the level saves like a zone. If you then remove the mod, a save made inside the map points at a
+level that no longer exists. Only do this for a map that stays installed. If the registration fails at startup while
+the loaded save is inside the map, the loader moves the save's level back to the Hub.
 
-Once the level is visible, the script looks for the tagged `TargetPoint`s in it and calls `K2_TeleportTo` on the
-player.
+## Loot
+A map can have loot nodes (`BP_LootSpawnPoint_C`, stashes). Their loot tags must exist in the game's loot config, so give the
+map a manifest, `Scripts/<Name>.loot.json` (or `LootManifest = "<path>"`; a `.loot.lua` returning the same table also
+works). Each entry: `tag` (your new loot tag), `source_tag` (a stock donor tag whose table and budget to borrow),
+`loot_points` (the budget), and optionally `table_asset` / `table_name` (a DataTable of your own in the map pak, so your
+tag does not share used points with the donor).
 
-"Are we in the Hub yet?" took a couple of goes to get right. While you're coming from the menu, the Hub level
-already counts as visible even though you're still in the menu room. So the script also waits for
-`LevelManager::IsReady()`, and checks twice, 2 s apart.
+The game's config is loaded at engine start and the garbage collector doesn't look inside it, so a table that only the
+config refers to would be collected and later crash the loot roll. So:
+- the tags are registered at startup on the donor's (stock) tables;
+- your own tables are kept alive by one Blueprint actor in the map, whose instance-editable array `Tables` lists them
+  (class `BP_<Name>_LootTables_C`, or `LootHolderClass`);
+- while the map's level is loaded the entries point at your tables, and before it goes they point back at the donor tables.
 
-Anything that touches the game runs inside `ExecuteInGameThread`, and the timers use `LoopAsync`.
+A map without loot nodes needs no manifest, and the example map has none.
 
-## Gameplay activation
-Maps are streamed in after the Hub already went through its level-start events, so the gameplay actors in your map
-never receive them. When the player has arrived (or the teardown gave up), the loader waits 3 s for the actors'
-BeginPlay and then, for every `PRBasicActor` whose level is your map:
-1. `OnLevelPrepare(<level tag>)` (spawner generators check whether they are excluded; one that is destroys itself),
-2. on loot points (`BP_LootSpawnPoint_C` and its children, which includes stashes): `GenerateLoot()` only. The game's
-   distance check (armed by `OnLevelPrepare`) spawns a point's items once the player is within `LootSpawnDistance`; calling
-   `SpawnLoot()` as well spawns every item twice. A point that already spawned its items gets no `OnLevelPrepare`,
-3. `OnLevelStarted(<level tag>)` (stash doors, anomalies), `OnGameStarted()`, `OnTransitionEnd()` (spawners and generators go live).
+## Limits
+- One native map per loader. To load several maps, copy the `ITRMapLoader` folder under another name (for example
+  `MyMapLoader`) and give each copy its own map, `LogTag`, `ConsoleCommand`, `Key` and `NativeTriggerMesh`. Copies are
+  separate UE4SS mods and don't share state. They can be installed at the same time (see below).
+- Everything lives in the game's memory: the level row and map centre vanish when the game closes and are registered again
+  at the next start. Nothing is written to the game's files.
+- The map must be built where it sits in the world (the example is built at X 0, Y -600000). Its baked navmesh tiles are absolute.
+- It never loads anything from the main menu: enter from the Hub.
+- Tested with UE4SS 3.0.1 (`c62ada0`) only. The table growth and `TMap:Add` it uses work around quirks of that build.
+- `UE4SS.log` (next to `UE4SS.dll`) shows what the loader does; look for lines starting with `[ITRMapLoader]` (your `LogTag`):
+  `native: registering ...`, `native: level row ... added`, `native: READY`, `native trigger: ...`, `native: arrived ...`,
+  `native exit ...`.
 
-Each call goes through the actor, so Blueprint overrides run. The level tag is the game's current one (`Level.Hub` while
-the Hub is torn down). The game's global events are not fired, because the game mode, the player and the UI listen to
-them too. Actors that destroyed themselves are skipped by the later steps. `UE4SS.log` shows every call
-(`[ITRMapLoader] activate: ...`), a count per class, and a one-line summary ending in `errors N`.
-- `ActivateGameplay = false` (global or per map) turns it off.
-- Loot comes from the vanilla `Loot.*` tags and budgets unless your map has custom ones. A loot manifest registers your own:
-  put `<Map Name>.loot.json` next to `main.lua` (or `LootManifest = "<path>"` on the map entry; a `.loot.lua` file
-  returning the same table works too). Just before the activation, `RegisterLootTags` adds each manifest tag
-  (`tag`, `source_tag` donor, `loot_points`, optional `table_asset`) to the game config's `LootArray` with `TMap:Add`,
-  taking the donor's DataTable (shared used points) unless the map pak includes the `table_asset`. Same as aiMod's
-  `Loot.cpp`, which writes the TMap's memory by hand instead. Each add is read back and logged (`loot: tag ... added`).
-  The map's tables must be kept alive by the map itself (Lua cannot add them to the GC root set): place one actor whose
-  `Tables` array (instance-editable, `DataTable` object references) lists them, class `BP_ItrShowcase_LootTables` in the
-  showcase. The loader takes the tables from that actor, re-points the entries at each load and points them back at the
-  donor tables on unload, so `LootArray` never holds a collected table.
-  `LootRetagShim = true` is a dev-only helper for the ITR Showcase map (retags its `G2_*` loot nodes and generator).
-- Whether this works through UE4SS Lua is not tested. Things most likely to need a fix on the first run: calling the
-  functions through the object (`A[Fn]`), the by-value `FGameplayTag` argument, and reading the level tag from
-  `PRGameData`. All are logged per call.
-- `RequireLevelManagerReady = false` is for desktop `-nohmd` test runs only: the game never reports its level manager
-  ready there, so the "are we in the Hub" check never passes without it.
+## Several maps
+Two loader folders can be installed together, as the example loader and the showcase loader are. Each is its own UE4SS mod
+with its own Lua state, its own registration (one level row each), its own hook on the grab event that only reacts to
+its own item, and its own key and console command. `main.lua` can be the same file in both. What must differ: the map,
+`LogTag`, `ConsoleCommand`, `Key` and `NativeTriggerMesh`. In the standard layout, each folder needs its own line in
+`mods.txt`.
 
-Testing this next to aiMod means switching aiMod's map handling off so the two don't both manage the map. That's
-done on our side and not part of this repo.
+## Streaming mode (the fallback)
+`Native = false` on a map keeps the original behaviour: stream the map in next to the Hub, move the player, tear down the
+Hub, and activate the map's gameplay by hand. It works for the cases where the native registration can't be used. It is
+less complete: the game does not know the map is a level, so there is no transition screen, saves can name the Hub
+while you stand in your map, and the loader has to do by hand what the game does for a level. Settings that only matter
+here: `AutoLoadInHub`, `HubTeardown`, `StagingMaxWestX`, `ActivateGameplay`, `LootRetagShim`, `HideLightingScenario`.
 
-## Why the Hub teardown exists
-Maps are streamed in next to the Hub, in the same world. Two things go wrong if the Hub's levels stay loaded:
-- In our aiMod tests, standing west of roughly world X -30000 with the Hub loaded sent the player back to the Hub (the
-  game's level manager dropped to level None, ran the transition room and respawned them in the Hub).
-- The Hub's fog and lighting (including its lighting-scenario level) apply to your map too.
+Tested in VR (October 2026): the map entry, one exit marker and the unload, with no Hub teardown. Not run in game: the Hub
+teardown, multiple exits, the re-entry memory, gameplay activation and the loot registration of this mode.
 
-So while a map is loaded, the loader replaces the Hub, in this order (it mirrors `Maps.cpp` in aiMod):
-1. Stream the map in and wait until it's visible.
-2. Teleport the player to a staging `TargetPoint` east of X `StagingMaxWestX`: one tagged `itr:tp:*`, `itr:arrive*` or
-   `itr:exit_id*` if there is one, else any, nearest to `itr:player_start`.
-3. Wait until the player stands on the map's ground (up to 15 s, otherwise the teardown is skipped). It asks the pawn
-   for its movement base; if the pawn can't say, a second at the staging point counts as standing on the map.
-4. Call `SetShouldBeVisible(false)` and `SetShouldBeLoaded(false)` on every other streaming level that's requested,
-   loaded or visible, and wait (up to 30 s) until they're all unloaded. A level that holds the player's pawn or
-   controller is kept and logged.
-5. Only then teleport to the arrival point (the remembered `itr:arrive:<ID>`, or `itr:player_start`), and log whether
-   the player stays there at +1, 3, 6, 10 and 20 s.
-
-If a Hub level doesn't unload, the player stays at the staging point and the exit still works.
-
-**Leaving** with the Hub gone:
-1. While the player still stands on the map, call the game's `LevelManager::LoadLevel(Level.Hub)`. It takes a
-   gameplay tag by value, so the out-parameter bug above doesn't affect it. If nothing happens within 4 s, the game
-   probably believes it's still in the Hub, and the loader tries `TransferToLevel(Level.Hub, None)` on the game mode.
-2. Wait until the Hub's main level is visible and the level manager is ready.
-3. If the game didn't move the player, teleport them back to where they were before the map loaded.
-4. Levels the game didn't bring back and that no level configuration lists (read from `SystemConfig`) are restored by
-   the loader. If the configuration can't be read, only lighting-scenario levels are.
-5. Unload the map, but only if it's still loaded and the player isn't standing on it. If they still are after 10 s,
-   the map is kept, it's logged, and you can use the exit again.
-
-Compared with aiMod, the port doesn't disable the zone gates and teleport exits in the persistent level (`L_Common`)
-while a map is loaded, and it only checks the player's pawn and controller when deciding whether a Hub level holds
-something of theirs (aiMod checks every attached or owned actor). We don't know yet whether either matters in practice.
+- **Entry.** `AutoLoadInHub = "MyMap"` loads the map once per Hub visit after two checks 2 s apart, or the key does.
+- **How it streams.** `LevelStreamingDynamic::LoadLevelInstance` can't be called from UE4SS 3.0.1 Lua (after a non-struct
+  out-parameter it reads the next argument from the wrong stack slot). So the script does what that function does inside:
+  `LevelStreaming::CreateInstance(<unique name>)` on an existing dynamic entry, `PackageNameToLoad` = your package,
+  `LevelTransform` = identity, `SetShouldBeLoaded(true)`, `SetShouldBeVisible(true)`. Then it teleports the player to the
+  start marker with `K2_TeleportTo`.
+- **Gameplay activation.** A streamed map missed the Hub's level-start events. About 3 s after you arrive, every
+  `PRBasicActor` in the map gets `OnLevelPrepare(<level tag>)`, loot points get `GenerateLoot()` (the game's
+  distance check then spawns the items; calling `SpawnLoot()` as well spawns everything twice), then `OnLevelStarted`,
+  `OnGameStarted` and `OnTransitionEnd`. The game's global events are not fired. `ActivateGameplay = false` turns it off.
+- **Hub teardown.** With the Hub loaded, standing west of roughly world X -30000 sent the player back to the Hub, and the
+  Hub's fog and lighting apply to your map. So the loader teleports to a staging `TargetPoint` east of `StagingMaxWestX`
+  (preferring `itr:tp:*`, `itr:arrive*`, `itr:exit_id*`), waits until you stand on the map, unloads every other
+  streaming level, and only then teleports to the arrival point. A map therefore needs at least one `TargetPoint` with
+  world X greater than -20000, or the teardown is skipped.
+- **Leaving.** With the Hub gone, the exit asks the game to load the Hub (`LevelManager::LoadLevel(Level.Hub)`, falling
+  back to `TransferToLevel`) while you still stand on the map, waits for the Hub, restores the Hub levels the game did
+  not bring back, and unloads the map once you are off it.
+- `RequireLevelManagerReady = false` is for desktop `-nohmd` test runs only.

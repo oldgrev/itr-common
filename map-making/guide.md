@@ -53,7 +53,7 @@ Things that do, so you need route B:
   https://drive.google.com/file/d/1yPFEPYuxcBEV3NKYOZnAxRIyEIQFFygn/view. One warning: its master materials are
   reconstructions, not the real graphs. Reference them, but don't cook your own copies. There are other copies of the
   SDK around (R3mains has one with a newer module, for example). For the gameplay blueprints in §4, use ChuckSharts's.
-- Something to load the map. The game can't enter custom maps yet, so we use UE4SS plus a small Lua script (§6).
+- Something to load the map. The game has no way to enter custom maps by itself, so we use UE4SS plus a small Lua script that registers the map as a level and enters it through the game's level transfer (§6).
 
 ## 2. Set up the project
 1. Copy [`example-map/`](../example-map/) somewhere. It's a blueprint-only project called `IntoTheRadius`. Keep that
@@ -387,21 +387,51 @@ A couple of things to watch:
   render-thread assert. We only saw it once and didn't dig into it.
 
 ## 6. Getting into the map
-The game's level list, gates and map screen don't know about custom maps, so something has to stream the map in.
-That's the only runtime code a map like this needs.
+The game's level list, gates and map screen don't know about custom maps, so something has to tell the game about the
+map and send you into it. That's the only runtime code a map like this needs.
 
-We use a UE4SS Lua script, [`loader-ue4ss/`](../loader-ue4ss/). It loads your map automatically when you arrive in
-the Hub (handy in VR) or when you press a key. Its README covers installing it. Follow the manual install on the
-Nexus page: the **contents** of the zip's `ue4ss` folder go into `Content\Paks`, and `Mods` gets renamed to
-`LuaMods` there. We tested it in VR. That was the original version, which has since gained a Hub teardown, several exits,
-re-entry and gameplay activation. Those parts are untested in Lua (the loader README has the details).
+We use a UE4SS Lua script, [`loader-ue4ss/`](../loader-ue4ss/). Its README covers installing it. Follow the manual
+install on the Nexus page: the **contents** of the zip's `ue4ss` folder go into `Content\Paks`, and `Mods` gets renamed to
+`LuaMods` there.
 
-If you want to write your own loader, this is what it has to do. Everything here is a blueprint-callable engine
+### The native way (the default)
+The loader registers your map with the game as a level, then enters it with the same call a zone gate makes. At startup
+it adds three things in memory: an unloaded streaming entry named after your map's world, a row in the game's level table
+under a tag such as `Level.Zone.MyMap`, and a map centre. The tag and world name are the only link between your map and the
+game, so the world's name (the `.umap` file name, for example `L_MyMap`) must match the main sublevel the loader registers.
+Entering calls the game mode's `TransferToLevel`, so you get the game's transition screen, the Hub unloading (which also
+solves the snap-back problem in §4), the level start events that make spawners, loot and anomalies work, and the level
+rules (time, inventory, generators). Leaving the same way brings you back to the Hub.
+
+What you do:
+1. In the map, place a `TargetPoint` tagged `itr:player_start` where people arrive, and one or more tagged `itr:exit`,
+   each with something visible on it. Please don't skip the exit: in VR there's no other way back apart from quitting to
+   the menu.
+2. Build the map where it will sit in the world (§4), cook and pack it (§5), and put the pak in `Content\Paks`.
+3. In the loader's `config.lua`, set the map's entry: `Name`, `Level` (the cooked package path), `StartTag`,
+   `NativeCenter` (the middle of the playable area, world cm), `NativeStart` (the start marker's position), and the entry
+   trigger: `NativeTriggerMesh` (the name of a Hub item's static mesh; picking that item up enters the map) and/or the
+   `Key`. Every field, its default and the limits are in the loader README.
+4. If the map has loot nodes, add a loot manifest and a table-holder actor (loader README, "Loot").
+
+Saving: by default no save is written while you are inside the map, so a save never names a level that exists only with
+the mod. Progress is kept by the Hub's autosave after you return. See "Saving" in the loader README for the other setting.
+
+Limits: one native map per loader folder (copy the folder to load several, each with its own item and key), UE4SS 3.0.1
+only, the level exists in memory only (it is registered again on every game start), and you enter from the Hub.
+
+### Streaming it in yourself (the fallback)
+The loader keeps the older mode (`Native = false`), which streams the map in next to the Hub and moves the player. It is
+less complete (no transition screen, the game doesn't know the map is a level, and the loader has to send the
+level-start events by hand), and the steps below are what it, or a loader you write, has to do. Of these, the entry, one
+exit and the unload were tested in VR; the Hub teardown and the activation pass were not run in game in Lua.
+
+If you want to stream a map in yourself, this is what has to happen. Everything here is a blueprint-callable engine
 function.
 1. In the Hub, call
    `LevelStreamingDynamic::LoadLevelInstance(World, "/Game/Mods/<Name>/L_<Name>", (0,0,0), (0,0,0), bSuccess)`.
    Don't do it from the main menu, because the teleport claims it worked but the VR player doesn't actually move.
-   UE4SS 3.0.1 can't make this particular call from Lua (there's an out-parameter bug), so our script copies what it
+   UE4SS 3.0.1 can't make this particular call from Lua (there's an out-parameter bug), so the loader copies what it
    does internally:
    - call `LevelStreaming::CreateInstance(<unique name>)` on any existing dynamic streaming entry;
    - set `PackageNameToLoad` to your map's package;
@@ -433,7 +463,7 @@ function.
    game didn't move them, teleport them back to where they stood. The game's Hub load **leaves your streamed map
    loaded**, so unloading it afterwards is your job (and only once the player isn't standing on it). In the harness
    that exit worked, the player ended in `Level.Hub` with the Hub levels visible, and the map was gone. If you
-   do all this, it's easiest to let [`loader-ue4ss/`](../loader-ue4ss/) do it, though its version hasn't run yet.
+   do all this, it's easiest to let the loader's streaming mode ([`loader-ue4ss/`](../loader-ue4ss/)) do it, though its version hasn't run in game yet.
 
 Working out when you're really in the Hub is fiddlier than it sounds. While you're coming from the menu, the Hub level
 shows as visible even though you're still standing in the menu room. Our script also waits for
@@ -452,8 +482,8 @@ shows as visible even though you're still standing in the menu room. Our script 
 | Placing gameplay blueprints in the editor | Works (§4). Harness-tested |
 | Making placed spawners, loot, stashes and anomalies actually start | Needs a runtime mod to send the level-start events ([`extended.md`](extended.md)). Harness-tested |
 | Your own loot tags and budgets | Registering them at load worked in the harness; including your own loot DataTables is in progress ([`extended.md`](extended.md)) |
-| Getting into the map | Needs a loader (§6) |
-| Gates and travel, map screen, missions, saves | Not available. These are all per-zone data assets (`DA_SystemConfig.LevelConfigurations`, `DA_MapPointsConfig`, `/Game/ITR/Configurations/Missions`). Registering a map there (a level config entry, a streaming entry, gates, map points) might let the game treat it like a normal zone, saves and travel included. That would mean overriding the game's data assets. Unexplored |
+| Getting into the map | Needs a loader (§6). The native mode (a registered level entered with `TransferToLevel`) was VR-tested with the showcase map |
+| Gates and travel, map screen, missions, saves | Partly. The loader's native mode registers a level config entry, a streaming entry and a map centre at runtime, so the level transfer, transition screen and level rules work, and saves are switched off inside the map by default (§6). Gates in the Hub, map markers beyond the centre, and missions are not registered |
 | AI cover (mimics taking cover) | The data format is understood and we have an offline generator, but nobody has seen a mimic use it yet ([`extended.md`](extended.md)). Offline only |
 
 ## 8. When things go wrong

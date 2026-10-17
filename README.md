@@ -3,6 +3,8 @@
 Bits and pieces for modding **Into the Radius 1** (PC VR, version 2.7.2). Mostly about getting custom maps into the
 game, plus the stuff needed along the way.
 
+![Picking up the sugar cube in the Hub loads the example map through the game's normal level transition](images/loading.gif)
+
 ## Example map test
 1. **UE4SS:** Example used was "UE4SS for ITR1" from Nexus Mods for no particular reason
    (https://www.nexusmods.com/intotheradiusvr/mods/359; I used `UE4SS-ITR-359-v3-0-1-321-gc62ada0`).
@@ -15,14 +17,15 @@ game, plus the stuff needed along the way.
 
    If the game hangs at startup (no window, about 12 MB of memory), `UE4SS.dll` isn't where `override.txt` points.
    That happens if you copy the `ue4ss` folder itself into `Paks` instead of its contents, as we first did.
-2. **The loader:** copy [`loader-ue4ss/ITRMapLoader`](loader-ue4ss/) into `Content\Paks\LuaMods\`. In
-   `ITRMapLoader\Scripts\config.lua`, set `AutoLoadInHub = "Example",`.
+2. **The loader:** copy [`loader-ue4ss/ITRMapLoader`](loader-ue4ss/) into `Content\Paks\LuaMods\`. Its `config.lua` is
+   already set up for the example map; there is nothing to edit.
 3. **The map:** copy [`example-map/prebuilt/zzz_ITRMap_Example_P.pak`](example-map/prebuilt/) into
    `<game>\IntoTheRadius\Content\Paks\`.
-4. **Play:** start the game and Continue into the Hub. A few seconds after the Hub has loaded, you're moved onto the
-   example map: a checker floor, walls, a hut and a ramp.
-5. **Leave:** walk onto the small pad with a post, about 8 m to your left. You're taken back to where you stood in
-   the Hub. On a keyboard, F7 does the same.
+4. **Play:** start the game and Continue into the Hub. Pick up the **sugar cube** (the little item with the mesh
+   `SM_Tea01D`, on the Hub's table). The game runs its usual transition and you arrive on the example map: a checker
+   floor, walls, a hut and a ramp.
+5. **Leave:** walk onto the small pad with a post, about 8 m to your left. You're taken back to the Hub through the
+   same transition. On a keyboard, F10 enters the map from the Hub and leaves it again.
 
 To undo it all, delete:
 - the example pak;
@@ -44,7 +47,7 @@ What's where:
 | [`map-making/guide.md`](map-making/guide.md) | The how-to: which editor, setting up the project, building the map, navmesh, packing it, getting into it | Yes, in game, except where it says otherwise |
 | [`map-making/extended.md`](map-making/extended.md) | Things a mod running in the game can add on top, like spawning loot and enemies or changing the lighting | Some of it. Each part says |
 | [`example-map/`](example-map/) | A small example map with scripts to build, cook and pack it, plus a prebuilt pak | Yes, in VR, including a material we compiled |
-| [`loader-ue4ss/`](loader-ue4ss/) | The UE4SS Lua script that gets you into a custom map and back out | Yes, VR and desktop |
+| [`loader-ue4ss/`](loader-ue4ss/) | The UE4SS Lua script that registers a custom map as a game level, enters it through the game's level transfer and brings you back. Each map's settings are in its `config.lua`; the older streaming mode is kept as a fallback | Native mode: yes, VR, with a large map; the example map's first run is pending |
 | [`engine/`](engine/) | Our patch for the Oculus UE 4.27 fork so it compiles shaders the game can use. It doesn't contain any of Epic's code; apply it with `tools/hashpatch.py` | Yes, it gives the same engine we built |
 | [`tools/`](tools/) | `merge_gitdeps.py` to get the fork's dependencies downloading, `hashpatch.py`, and tools for pulling shader layouts out of the exe and looking at compiled shaders | We used all of them |
 | [`tools/material-export/`](tools/material-export/) | Reads a cooked game material or material instance into JSON (parent, parameters, static switches, overrides, texture settings), and an editor script that rebuilds the instance in your project. A master's graph isn't in the cooked file, so masters come out as stand-ins | Export side: compared with the SDK on 300 materials, offline. Editor script: **not run in an editor yet** |
