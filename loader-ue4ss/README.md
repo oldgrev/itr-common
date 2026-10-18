@@ -113,7 +113,7 @@ A map can be entered three ways; use any of them.
   every 10 s, only in the Hub, and only once the map is registered. `SM_Tea01D` is the sugar cube; `SM_Pumice01` (a
   pumice stone) is the only one of its kind in the Hub. Pick an item that only this loader uses.
 - **A key.** `Key` enters from the Hub and leaves from the map. The default F10 is one no common ITR mod uses; avoid F5
-  to F7 if you play with the Miyabi companion mod.
+  to F7.
 - **A console command.** `itrmap enter` / `itrmap leave`. A command that names a map this loader doesn't have is left
   for other handlers.
 

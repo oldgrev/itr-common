@@ -1981,12 +1981,53 @@ local function NativeHookTrigger()
         tostring(Opt(Map, "NativeTriggerMesh", nil)), Map.Name, OkH and "registered" or ("FAILED " .. tostring(Err)))
 end
 
+-- Re-entry of the map by the game itself (fog wall / tide / death reload = IPRGameMode::ReEnterCurrentLevel, no NativeEnter):
+-- the level is unloaded and loaded again behind the transition screen. Its table holder goes with the old level, so the own
+-- loot entries move back to the donor tables as soon as the transition starts (before the old tables can be collected) and
+-- to the new level's holder as soon as the level is loaded again (before its loot nodes roll), as NativeEnter does.
+local NativeReturn = nil     -- { T0 } while waiting for the map's level to come back
+local function NativeReentryWatch(Map)
+    Every(100, function()
+        if NativeTrip then return false end
+        if NativeLootOwn and Current and Current.Native and InTransition() then
+            pcall(RepointOwnTables, Map, true)
+            NativeLootOwn = false
+            NativeReturn = { T0 = Now() }
+            Log("native: a transition started while the map is loaded (fog / tide / death / gate); loot entries back on the donor tables")
+            return false
+        end
+        if NativeReturn then
+            local LevelNow = LevelTagNow()
+            if LevelNow and LevelNow ~= NativeState.Tag and not InTransition() then
+                Log("native: the transition left the map (level now %s)", LevelNow)
+                NativeReturn = nil
+                return false
+            end
+            local W = UEHelpers.GetWorld()
+            local S = Valid(W) and FindNativeEntry(W, NativeState.Sub) or nil
+            if LevelNow == NativeState.Tag and S and CallBool(S, "IsLevelLoaded") then
+                local OkR, NR = pcall(RepointOwnTables, Map, false)
+                NativeLootOwn = OkR and (NR or 0) > 0
+                Log("native: the map's level is back after %.1f s (re-entered by the game); own loot tables %s", (Now() - NativeReturn.T0) / 1000,
+                    NativeLootOwn and ("in use (" .. tostring(NR) .. " entries)") or "not available, donor tables kept")
+                NativeReturn = nil
+                if Current then Current.Stream = S end
+            elseif Now() - NativeReturn.T0 > 180000 then
+                Log("native: the map's level did not come back within 180 s (level %s)", tostring(LevelNow))
+                NativeReturn = nil
+            end
+        end
+        return false
+    end, 30)
+end
+
 -- Background: registration, then a light watch (left the map another way: death, fog, gate)
 local function NativeStartup()
     local Map = NativeMap()
     if not Map then return end
     NativeState.Map, NativeState.Tag, NativeState.Sub = Map, NativeTagOf(Map), NativeSubOf(Map)
     Log("native: registering %s as %s (main sublevel %s) once the game is idle", Map.Name, NativeState.Tag, NativeState.Sub)
+    NativeReentryWatch(Map)
     Every(1000, function()
         NativeRegisterTick()
         if NativeState.Ready and not TriggerHooked then NativeHookTrigger() end
@@ -2008,6 +2049,7 @@ local function NativeStartup()
                 pcall(RepointOwnTables, Map, true)
                 NativeLootOwn = false
                 Log("native: the map's level is gone; loot entries back on the donor tables")
+                if Current and Current.Native and not NativeReturn then NativeReturn = { T0 = Now() } end   -- a game re-entry may follow
             end
         end
         if Current and Current.Native and Current.Phase == "active" and not NativeTrip then
