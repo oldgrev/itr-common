@@ -1,0 +1,116 @@
+{
+ "format": "hashpatch/1",
+ "files": [
+  {
+   "path": "Engine/Source/Runtime/Engine/Classes/Components/ContactShadowImpostorComponent.h",
+   "create": true,
+   "edits": [
+    {
+     "line": 1,
+     "remove": [],
+     "add": [
+      {
+       "text": "#pragma once"
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "#include \"CoreMinimal.h\""
+      },
+      {
+       "text": "#include \"Components/SceneComponent.h\""
+      },
+      {
+       "text": "#include \"ContactShadowImpostorComponent.generated.h\""
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "/**"
+      },
+      {
+       "text": " * ITR component declaration recovered from the game's UHT dump."
+      },
+      {
+       "text": " * Preserves the original /Script/Engine class path and serialized radius."
+      },
+      {
+       "text": " * The game's custom contact-shadow renderer is not reconstructed here."
+      },
+      {
+       "text": " */"
+      },
+      {
+       "text": "UCLASS(Blueprintable, EditInlineNew, ClassGroup=Custom, meta=(BlueprintSpawnableComponent))"
+      },
+      {
+       "text": "class ENGINE_API UContactShadowImpostorComponent : public USceneComponent"
+      },
+      {
+       "text": "{"
+      },
+      {
+       "text": "    GENERATED_BODY()"
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "public:"
+      },
+      {
+       "text": "    UPROPERTY(BlueprintReadWrite, EditAnywhere, Interp, Category=\"Contact Shadow\", meta=(AllowPrivateAccess=true))"
+      },
+      {
+       "text": "    float Radius;"
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "    UContactShadowImpostorComponent(const FObjectInitializer& ObjectInitializer);"
+      },
+      {
+       "text": "};"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "path": "Engine/Source/Runtime/Engine/Private/Components/ContactShadowImpostorComponent.cpp",
+   "create": true,
+   "edits": [
+    {
+     "line": 1,
+     "remove": [],
+     "add": [
+      {
+       "text": "#include \"Components/ContactShadowImpostorComponent.h\""
+      },
+      {
+       "text": ""
+      },
+      {
+       "text": "UContactShadowImpostorComponent::UContactShadowImpostorComponent(const FObjectInitializer& ObjectInitializer)"
+      },
+      {
+       "text": "    : Super(ObjectInitializer)"
+      },
+      {
+       "text": "    , Radius(50.0f)"
+      },
+      {
+       "text": "{"
+      },
+      {
+       "text": "}"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

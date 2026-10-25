@@ -48,7 +48,7 @@ What's where:
 | [`map-making/extended.md`](map-making/extended.md) | Things a mod running in the game can add on top, like spawning loot and enemies or changing the lighting | Some of it. Each part says |
 | [`example-map/`](example-map/) | A small example map with scripts to build, cook and pack it, plus a prebuilt pak | Yes, in VR, including a material we compiled |
 | [`loader-ue4ss/`](loader-ue4ss/) | The UE4SS Lua script that registers a custom map as a game level, enters it through the game's level transfer and brings you back. Each map's settings are in its `config.lua`; the older streaming mode is kept as a fallback | Native mode: yes, VR, with a large map; the example map's first run is pending |
-| [`engine/`](engine/) | Our patch for the Oculus UE 4.27 fork so it compiles shaders the game can use. It doesn't contain any of Epic's code; apply it with `tools/hashpatch.py` | Yes, it gives the same engine we built |
+| [`engine/`](engine/) | Our patches for the Oculus UE 4.27 fork so it compiles shaders the game can use, plus a `ContactShadowImpostorComponent` class fix contributed by [ChuckSharts](https://github.com/ChuckSharts/). They don't contain any of Epic's code; apply them with `tools/hashpatch.py` | The shader patches: yes, they give the same engine we built. The class fix: applies cleanly, not compile-checked yet |
 | [`tools/`](tools/) | `merge_gitdeps.py` to get the fork's dependencies downloading, `hashpatch.py`, and tools for pulling shader layouts out of the exe and looking at compiled shaders | We used all of them |
 | [`tools/material-export/`](tools/material-export/) | Reads a cooked game material or material instance into JSON (parent, parameters, static switches, overrides, texture settings), and an editor script that rebuilds the instance in your project. A master's graph isn't in the cooked file, so masters come out as stand-ins | Export side: compared with the SDK on 300 materials, offline. Editor script: **not run in an editor yet** |
 | [`data/ub/`](data/ub/) | The game's shader parameter layouts, read out of `IntoTheRadius-Win64-Shipping.exe` 2.7.2 | |
@@ -58,6 +58,10 @@ A few notes:
   contains our lines, so you need your own copy of the engine source to apply it.
 - `data/ub` is just names, offsets and sizes from the game's exe. There are no game assets in this repo.
 - The Python tools need Python 3, and some need `pip install pefile capstone lz4`.
+
+## Credits
+- [ChuckSharts](https://github.com/ChuckSharts/) contributed `engine/itr-contactshadowimpostor.hashpatch.json`, which
+  restores the game's `ContactShadowImpostorComponent` class in the Engine module (details in the guide, §3).
 
 ## Licence
 - Everything here is under the **GNU Affero General Public License v3.0** ([`LICENSE`](LICENSE)), apart from:

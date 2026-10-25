@@ -86,7 +86,12 @@ You'll use these files from this repo: [`tools/merge_gitdeps.py`](../tools/merge
 [`engine/itr-ub-layouts.hashpatch.json`](../engine/itr-ub-layouts.hashpatch.json),
 [`engine/itr-fullyrough.hashpatch.json`](../engine/itr-fullyrough.hashpatch.json),
 [`engine/itr-forwardssr.hashpatch.json`](../engine/itr-forwardssr.hashpatch.json) and, if you import game particle
-systems, [`engine/itr-particles-keep-cooked.hashpatch.json`](../engine/itr-particles-keep-cooked.hashpatch.json).
+systems, [`engine/itr-particles-keep-cooked.hashpatch.json`](../engine/itr-particles-keep-cooked.hashpatch.json) and,
+if your assets use the game's contact-shadow component,
+[`engine/itr-contactshadowimpostor.hashpatch.json`](../engine/itr-contactshadowimpostor.hashpatch.json)
+(contributed by [ChuckSharts](https://github.com/ChuckSharts/)).
+
+Realistically, apply them all to save having to build again in the future.
 
 ```bat
 :: 1. Get the source at the release tag. Keep the path short, UnrealBuildTool falls over on paths
@@ -112,6 +117,9 @@ python <itr-common>\tools\hashpatch.py apply <itr-common>\engine\itr-fullyrough.
 python <itr-common>\tools\hashpatch.py apply <itr-common>\engine\itr-forwardssr.hashpatch.json C:\ue427
 :: 3c. Optional: keep imported cooked particle systems as cooked (see below). Only needed to import game particle systems.
 python <itr-common>\tools\hashpatch.py apply <itr-common>\engine\itr-particles-keep-cooked.hashpatch.json C:\ue427
+:: 3d. Optional: the game's ContactShadowImpostorComponent class in the Engine module (see below). It only adds two
+::     new files, so it applies in any order.
+python <itr-common>\tools\hashpatch.py apply <itr-common>\engine\itr-contactshadowimpostor.hashpatch.json C:\ue427
 
 :: 4. Build
 Setup.bat
@@ -207,6 +215,36 @@ covers every path that rebuilds: load (`UParticleEmitter::PostLoad`), property e
 `UParticleModule::PostEditChangeProperty`) and Cascade. Cooking only loads and saves, so the cooked data goes through
 unchanged. Packages without the marker build as before; the check doesn't even create a metadata object for them. In
 Cascade, edits to a marked GPU emitter don't change its simulation data.
+
+**The ContactShadowImpostor patch** (`engine/itr-contactshadowimpostor.hashpatch.json`, 2 new files:
+`Classes/Components/ContactShadowImpostorComponent.h` and `Private/Components/ContactShadowImpostorComponent.cpp`
+under `Engine/Source/Runtime/Engine`). Contributed by [ChuckSharts](https://github.com/ChuckSharts/). The game has a
+component class that stock 4.27 doesn't, `/Script/Engine.ContactShadowImpostorComponent`, so assets that reference it
+don't resolve. The patch adds it to the Engine module under its original path:
+- `USceneComponent` base, `ENGINE_API`, Blueprintable, EditInlineNew, `ClassGroup=Custom` and
+  `BlueprintSpawnableComponent`;
+- one property, `Radius` (float, `BlueprintReadWrite`, `EditAnywhere`, `Interp`, default 50.0). It is in the category
+  `Contact Shadow`, which UHT requires for a property exposed from an Engine module; it is editor metadata, not a new
+  property;
+- the declaration and the constructor default come from the game's reflection (UHT) dump.
+
+Limits: this is class and serialization compatibility only. The game's contact-shadow rendering isn't reconstructed,
+so the component does nothing visible. The patch hasn't been compile-checked in an engine build yet; it does apply
+cleanly (the files it creates must not exist yet, and a second apply is refused).
+
+If your project already works around the missing class with a project-owned copy and a redirect, you can drop that
+once you're on an engine with this patch. Only do this after switching to the patched engine:
+1. Back up and remove the project's own copy of the class, `ContactShadowImpostorComponent.h` / `.cpp` under
+   `Source/IntoTheRadius/Public` and `Private`.
+2. Remove the redirect from the project's `DefaultEngine.ini`:
+   `+ClassRedirects=(OldName="/Script/Engine.ContactShadowImpostorComponent",NewName="/Script/IntoTheRadius.ContactShadowImpostorComponent")`
+3. Rebuild the project against the patched engine.
+4. Assets you saved with the project's copy may need a temporary reverse redirect while you load and resave them:
+   `+ClassRedirects=(OldName="/Script/IntoTheRadius.ContactShadowImpostorComponent",NewName="/Script/Engine.ContactShadowImpostorComponent")`.
+   Don't keep both directions. Assets from the game already point at `/Script/Engine` and need no migration redirect.
+5. Check the affected assets load before you remove the migration redirect.
+
+Don't remove the workaround while you're still on an engine without the class.
 
 **Checking your build.** It's worth doing before you make anything. This compares the uniform buffers your editor
 builds with the game's (`pip install pefile capstone` first):

@@ -8,7 +8,8 @@
 - **`hashpatch.py make|apply|check`**
   Engine patches that don't contain any engine source. `apply <json> <engine root>` (the engine root is the folder
   with `Engine\` in it) checks every file's hash first, and won't apply if anything doesn't match or it's already
-  been applied.
+  been applied. A patch can also create new files (stored with `"create": true`); `apply` refuses if such a file
+  already exists. `engine/itr-contactshadowimpostor.hashpatch.json` is one of those.
 
 - **`ub_extract_exe.py [exe or dll] --dump out.json`** (or `--find <member>`)
   Pulls every shader parameter struct out of a UE 4.27 shipping exe or a Development editor DLL: member names,
