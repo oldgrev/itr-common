@@ -1,0 +1,7 @@
+{
+  "name": "SecondAddon",
+  "target": "/Game/ITR/Levels/Hub/L_Hub",
+  "level": "/Game/Mods/SecondAddon/L_SecondAddon",
+  "transform": { "location": [100, 0, 0], "rotation": [0, 90, 0] },
+  "hide": [ "SM_Props_WoodenPallet_01_a6", "SM_DoesNotExist_1" ]
+}

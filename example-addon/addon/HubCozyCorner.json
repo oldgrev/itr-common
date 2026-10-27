@@ -1,0 +1,9 @@
+{
+  "name": "HubCozyCorner",
+  "target": "/Game/ITR/Levels/Hub/L_Hub",
+  "level": "/Game/Mods/HubCozyCorner/L_HubCozyCorner",
+  "transform": { "location": [0, 0, 0], "rotation": [0, 0, 0] },
+  "hide": [
+    { "actor": "SM_Props_WoodenPallet_01_a6", "level": "/Game/ITR/Levels/Hub/L_Hub" }
+  ]
+}

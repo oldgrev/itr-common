@@ -1,0 +1,7 @@
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+# Content/ is made by the scripts: the add-on level, and the Hub reference (stand-ins of game meshes rebuilt from your
+# own game files). Neither is published.
+build/
