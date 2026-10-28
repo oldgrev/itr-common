@@ -53,6 +53,7 @@ What's where:
 | [`engine/`](engine/) | Our patches for the Oculus UE 4.27 fork so it compiles shaders the game can use, plus a `ContactShadowImpostorComponent` class fix contributed by [ChuckSharts](https://github.com/ChuckSharts/). They don't contain any of Epic's code; apply them with `tools/hashpatch.py` | The shader patches: yes, they give the same engine we built. The class fix: applies cleanly, not compile-checked yet |
 | [`tools/`](tools/) | `merge_gitdeps.py` to get the fork's dependencies downloading, `hashpatch.py`, and tools for pulling shader layouts out of the exe and looking at compiled shaders | We used all of them |
 | [`tools/material-export/`](tools/material-export/) | Reads a cooked game material or material instance into JSON (parent, parameters, static switches, overrides, texture settings), and an editor script that rebuilds the instance in your project. A master's graph isn't in the cooked file, so masters come out as stand-ins | Export side: compared with the SDK on 300 materials, offline. Editor script: **not run in an editor yet** |
+| [`bullet-penetration/`](bullet-penetration/) | A UE4SS Lua mod plus a small Blueprint pak: bullets of every shooter pass through thin walls by material and thickness, with prebuilt pak and the generator that makes it | It's fast as balls (+0.05 ms frame time at 10 shots/s); and probably unbalanced as fff. I probably need to test it more with armored enemies |
 | [`data/ub/`](data/ub/) | The game's shader parameter layouts, read out of `IntoTheRadius-Win64-Shipping.exe` 2.7.2 | |
 
 A few notes:
