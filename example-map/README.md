@@ -17,8 +17,11 @@ The long explanation is in [`../map-making/guide.md`](../map-making/guide.md).
 
 ## Just want to try it?
 [`prebuilt/zzz_ITRMap_Example_P.pak`](prebuilt/) is this map already built with the special editor (343 KB,
-SHA-256 `a4b5eccd579f981e4d02ed7051d48e32c37d7ae1e017d3a7d9c37786e5b17dfc`). The steps for installing UE4SS, the
-loader and the pak are at the top of [the main README](../README.md#example-map-test).
+SHA-256 `a4b5eccd579f981e4d02ed7051d48e32c37d7ae1e017d3a7d9c37786e5b17dfc`). Next to it is
+[`prebuilt/zzz_ITRMap_Example_Tags_P.pak`](prebuilt/) (692 bytes, SHA-256
+`ce3e37b2cddc85ae184de290b49c50b9d570a8b2a597648d82a156c1639c3f15`), the level tag pak. Install both, and delete both to
+uninstall. The steps for installing UE4SS, the loader and the paks are at the top of
+[the main README](../README.md#example-map-test).
 
 ## Building it yourself
 1. Copy this folder somewhere. It's a blueprint-only project, and `Content/` gets created in step 3.
@@ -44,10 +47,13 @@ loader and the pak are at the top of [the main README](../README.md#example-map-
    ```powershell
    .\build-map.ps1 -Engine "C:\ue427\Engine" -Install
    ```
+   That also builds and installs `zzz_ITRMap_Example_Tags_P.pak` (with [`build-tags.ps1`](build-tags.ps1)), which registers
+   the level tag `Level.Zone.Example`. The example leaves `NativeSaves` off, so nothing depends on it here, but a map that
+   saves inside itself does (see "Saving" in the [loader README](../loader-ue4ss/README.md)).
 6. Load it with the [loader](../loader-ue4ss/): grab the sugar cube in the Hub (or press F10, the loader's default key).
 
 To turn it into your own map, change `FOLDER`, `HOST` and `MAP` at the top of both scripts (or just build in the
-editor by hand), and pass `-Map <Name>` to `build-map.ps1`.
+editor by hand), and pass `-Map <Name>` to `build-map.ps1` (plus `-Tag <your NativeTag>` if it isn't `Level.Zone.<Name>`).
 
 ## What we tested (October 2026)
 - Steps 2 to 5 with the special editor. The material compiled to 30 shaders, the navmesh got saved into the map, and

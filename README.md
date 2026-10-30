@@ -20,7 +20,9 @@ game, plus the stuff needed along the way.
 2. **The loader:** copy [`loader-ue4ss/ITRMapLoader`](loader-ue4ss/) into `Content\Paks\LuaMods\`. Its `config.lua` is
    already set up for the example map; there is nothing to edit.
 3. **The map:** copy [`example-map/prebuilt/zzz_ITRMap_Example_P.pak`](example-map/prebuilt/) into
-   `<game>\IntoTheRadius\Content\Paks\`.
+   `<game>\IntoTheRadius\Content\Paks\`. Copy `zzz_ITRMap_Example_Tags_P.pak` from the same folder with it: it registers the
+   map's level tag so a save made in the map keeps its level (the example doesn't save in the map by default, but your own maps
+   will want it; see "Saving" in the loader README).
 4. **Play:** start the game and Continue into the Hub. Pick up the **sugar cube** (the little item with the mesh
    `SM_Tea01D`, on the Hub's table). The game runs its usual transition and you arrive on the example map: a checker
    floor, walls, a hut and a ramp.
@@ -28,7 +30,7 @@ game, plus the stuff needed along the way.
    same transition. On a keyboard, F10 enters the map from the Hub and leaves it again.
 
 To undo it all, delete:
-- the example pak;
+- the two example paks (`zzz_ITRMap_Example_P.pak` and `zzz_ITRMap_Example_Tags_P.pak`);
 - `dwmapi.dll` and `override.txt`;
 - the UE4SS files in `Content\Paks`: `UE4SS.dll`, `UE4SS-settings.ini`, `LuaMods`, `LogicMods` and the rest of what
   you copied.

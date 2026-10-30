@@ -1776,6 +1776,17 @@ local function NativeRegisterTick()
     NativeState.Ready = true
     Log("native: READY: %s is a game level (%s). Entering uses the game's TransferToLevel; the streaming loader is not used.",
         Map.Name, NativeState.Tag)
+    -- Probe (once): is the map's level tag in the gameplay tag tree? A save keeps the tag only when it is
+    -- (see "Saving" in the loader README: the tags pak).
+    local OkT, Reg = pcall(function()
+        local Lib = StaticFindObject("/Script/GameplayTags.Default__BlueprintGameplayTagLibrary")
+        return Lib:MatchesTag(TagStruct(NativeState.Tag), TagStruct("Level.Zone"), false)
+    end)
+    local Registered = OkT and Reg == true
+    Log("tags: %s is %s in the gameplay tag tree%s", NativeState.Tag, Registered and "REGISTERED" or "NOT registered",
+        Registered and " (a save made in the map keeps its level)"
+                   or (Opt(Map, "NativeSaves", false) and ": NativeSaves is on, so a save made in the map will load into the Hub; install the tags pak (see Saving in the README)"
+                                                       or " (fine while NativeSaves is false)"))
 end
 
 -- Arrival transform for the save slot the game reads first (PlayerGameData position for the level)

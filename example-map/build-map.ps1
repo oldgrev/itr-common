@@ -9,6 +9,7 @@
 param(
     [Parameter(Mandatory)][string]$Engine,           # ...\Engine of the editor that built the map
     [string]$Map = "Example",
+    [string]$Tag = "",                               # the loader's NativeTag for the map; default Level.Zone.<Map>
     [string]$GameDir = "C:\Program Files (x86)\Steam\steamapps\common\IntoTheRadius",
     [switch]$Install
 )
@@ -45,8 +46,14 @@ $files | ForEach-Object {
 if ($LASTEXITCODE -ne 0) { throw "UnrealPak failed ($LASTEXITCODE)" }
 Write-Host "Packed $($files.Count) files -> $Pak"
 
+# 4. The level tag pak: registers the level's gameplay tag so a save made in the map keeps its level (matters when the
+#    loader has NativeSaves = true; harmless otherwise). Pass -Tag if the map's NativeTag is not Level.Zone.<Map>.
+& (Join-Path $PSScriptRoot "build-tags.ps1") -Engine $Engine -Map $Map -Tag $Tag
+
 if ($Install) {
     if (Get-Process "IntoTheRadius-Win64-Shipping" -ErrorAction SilentlyContinue) { throw "Close the game first (paks are mounted at startup)." }
     Copy-Item $Pak (Join-Path $GameDir "IntoTheRadius\Content\Paks") -Force
     Write-Host "Installed -> $GameDir\IntoTheRadius\Content\Paks\$PakName"
+    Copy-Item (Join-Path $OutDir "zzz_ITRMap_$($Map)_Tags_P.pak") (Join-Path $GameDir "IntoTheRadius\Content\Paks") -Force
+    Write-Host "Installed -> $GameDir\IntoTheRadius\Content\Paks\zzz_ITRMap_$($Map)_Tags_P.pak"
 }

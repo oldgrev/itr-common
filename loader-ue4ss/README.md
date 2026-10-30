@@ -155,9 +155,36 @@ save file is written while you stand in the map, and no save ever names a level 
 installed. What you did there (loot taken, spawner state, your inventory) is written by the Hub's autosave after you
 return. Quitting while inside the map loses that visit back to the last Hub save.
 
-With `NativeSaves = true` the level saves like a zone. If you then remove the mod, a save made inside the map points at a
-level that no longer exists. Only do this for a map that stays installed. If the registration fails at startup while
-the loaded save is inside the map, the loader moves the save's level back to the Hub.
+With `NativeSaves = true` the level row saves like a zone, but that is **not enough** for the save to load back into the map.
+A save stores every gameplay tag as its name and turns the name back into a tag when it loads, and a tag the game has not
+registered comes back as `None`. So without a registered level tag the save loses its level: Continue opens the Hub, and
+whatever you left in the map (items on the ground, the sleep marker) is gone. Your map's tag (`Level.Zone.<Name>`, or your
+`NativeTag`) is not registered by the game, so you have to register it:
+
+1. **The tags pak.** A tag ini is read from `IntoTheRadius/Config/Tags/` at startup, and a pak can put one there. The ini is
+   one line, with a file name that is yours and unique:
+   ```ini
+   [/Script/GameplayTags.GameplayTagsList]
+   GameplayTagList=(Tag="Level.Zone.MyMap",DevComment="MyMap level; registered so a save made in the map keeps its level")
+   ```
+   Pack it with the mount point `../../../IntoTheRadius/Config/Tags/`, as its own small pak (about 700 bytes), and name it
+   `zzz_ITRMap_<Name>_Tags_P.pak`. Don't add the ini to the map pak: a Config file changes the pak's mount point, and the map
+   pak's is `../../../IntoTheRadius/Content/Mods/<Name>/`.
+   Never call the ini `LevelGameplayTags.ini`: a pak file at the same path as a game file replaces it, and that one is the
+   game's list of level tags.
+2. **Where it goes.** Next to the map pak, in `Content\Paks` (or `Content\Paks\~mods`). The game has to be restarted after you
+   add it.
+3. **How to build it.** [`example-map/build-tags.ps1`](../example-map/build-tags.ps1) does steps 1 and 2 from a tag name
+   (`.\build-tags.ps1 -Engine "C:\ue427\Engine" -Map MyMap [-Tag Level.Zone.Mine] [-Install]`), and the example's
+   `build-map.ps1` runs it after packing the map. The example's prebuilt copy is
+   [`example-map/prebuilt/zzz_ITRMap_Example_Tags_P.pak`](../example-map/prebuilt/).
+4. **Check it.** The loader logs one line at startup, `tags: Level.Zone.MyMap is REGISTERED` or `NOT registered` (in
+   `UE4SS.log`). Then save inside the map, quit, press Continue: you should land in the map, where you saved.
+
+Keep the tags pak and the loader installed together. If the loader is gone and the tags pak is not, the tag is registered but
+the level does not exist, so Continue can't open it. If you remove the mod entirely, a save made inside the map names a level
+the game doesn't know and opens the Hub, so leave the map before you uninstall. If the registration fails at startup while the
+loaded save is inside the map, the loader moves the save's level back to the Hub.
 
 ## Loot
 A map can have loot nodes (`BP_LootSpawnPoint_C`, stashes). Their loot tags must exist in the game's loot config, so give the

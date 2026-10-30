@@ -34,7 +34,8 @@ return {
             -- NativeSaves: false = no autosave, save-on-load, save-on-exit or sleeping while you are in the map, so no save file
             -- ever names the level (safe if you remove the mod later; progress is kept by the Hub autosave after you return).
             -- true = the level saves like a zone; if the mod is removed, a save made there would point at a level that no
-            -- longer exists, so only use it for a map you are sure stays installed.
+            -- longer exists, so only use it for a map you are sure stays installed. It also needs the level tag registered
+            -- (a zzz_ITRMap_<Name>_Tags_P.pak, see "Saving" in the loader README), or the save loads into the Hub.
             NativeSaves = false,
             -- NativeReloadOnTide: true only once the map has its own tide actor (reloads the level when a tide happens).
             NativeReloadOnTide = false,

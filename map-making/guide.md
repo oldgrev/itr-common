@@ -455,6 +455,13 @@ What you do:
 Saving: by default no save is written while you are inside the map, so a save never names a level that exists only with
 the mod. Progress is kept by the Hub's autosave after you return. See "Saving" in the loader README for the other setting.
 
+If you do want saves inside the map (`NativeSaves = true`), add one more small pak, the tags pak. A save stores the level's
+gameplay tag as a name, and the game turns an unregistered name into `None` when it loads the save, so Continue would open the
+Hub and anything you left in the map would be gone. The tags pak holds a one-line tag ini that registers your tag
+(`Level.Zone.<Name>` unless you set `NativeTag`), mounted at `../../../IntoTheRadius/Config/Tags/`. Build it with
+[`example-map/build-tags.ps1`](../example-map/build-tags.ps1) (`-Map <Name>`; `build-map.ps1` runs it for you), and put
+`zzz_ITRMap_<Name>_Tags_P.pak` next to the map pak. The details and a check are under "Saving" in the loader README.
+
 Limits: one native map per loader folder (copy the folder to load several, each with its own item and key), UE4SS 3.0.1
 only, the level exists in memory only (it is registered again on every game start), and you enter from the Hub.
 
