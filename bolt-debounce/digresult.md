@@ -63,7 +63,7 @@ Read-only research result. Nothing in the repo or the game was changed. Evidence
   handler runs right after the stock handler, inside the same native tick, before the next one. It cannot pre-empt the stock handler.
 - **Cannot cover: the lockout (rule 3).** Re-entry to Opened is `|Y-rear| <= 0.01` against the cached rear; no public property moves the rear
   or blocks the entry (`SlideCoeff` would freeze the bolt for the hand, which changes handling). The only routes are overriding `ExtractRound`
-  in a child class (section 1.5) or the aiMod ProcessEvent hook (not shareable). With rule 2's retrigger the residual needs a forward move past
+  in a child class (section 1.5) or the aiMod ProcessEvent hook (not shareable because people shouldn't have to download an additional dll that does proxy dll etc etc). With rule 2's retrigger the residual needs a forward move past
   1 cm held for N ms, or past mid-stroke, then a pull back within N: a deliberate partial stroke.
 - Corner: a 4 -> 2 jump during a hold (only on a frame hitch: mid-stroke to the front in one frame) skips the stock feed. The component then
   does it: `SetLoadingLock(true)` (IAmmoContainer message on the internal mag), `LoadRound()` if the chamber is empty, `bJammed = Is Going to Jam`.
@@ -85,11 +85,11 @@ Read-only research result. Nothing in the repo or the game was changed. Evidence
   They reference the game classes by path; the build project has never-packed stand-ins of `BPA_BaseItem`, `BP_FirearmItem`,
   `BP_MagFirearmItem`, `BPA_Firearm_BoltAction`, `BP_Firearm_PumpAction` with only the touched variables/functions, each declared on the class
   that declares it in the game (`declaredIn` in the T-214 bp JSON), the same pattern as bullet-penetration's stand-in parent.
-- Lua (load time only): find/load the manager class, `World:SpawnActor` it once per world (npc-lab precedent `npc-lab/lua/NpcLab/Scripts/main.lua:119-137`),
+- Lua (load time only): find/load the manager class, `World:SpawnActor` it once per world (npc-lab precedent `npc-lab/lua/NpcLab/Scripts/main.lua:119-137`)  ```I don't like npc-lab being a reference as it's not performant and testing only! - grev```,
   write the tunables into the manager and its class defaults, register the console command `bdb`. A 2 s loop only checks that the cached manager
   is still valid in the current world (no FindAllOf). In measurement mode only, a 500 ms loop copies new log lines.
 - The manager gets the hands as `VRBaseCharacter.LeftMotionController / RightMotionController` of the player pawn (npc-lab precedent
-  `npc-lab/Tools/gen_specs.py:504-506, 2089-2100`), binds `OnGrippedObject(GripInformation)` / `OnDroppedObject(GripInformation, bWasSocketed)`
+  `npc-lab/Tools/gen_specs.py:504-506, 2089-2100`), binds `OnGrippedObject(GripInformation)` / `OnDroppedObject(GripInformation, bWasSocketed)`  ```I don't like npc-lab being a reference as it's not performant and testing only! - grev```
   (SDK `VRExpansionPlugin_classes.hpp:341-342`), and on start registers whatever the hands already hold (`GetGrippedActors`/`GetGrippedComponents`, :398-399).
   A 2 s Blueprint timer rebinds if the pawn changed.
 
@@ -100,7 +100,7 @@ Read-only research result. Nothing in the repo or the game was changed. Evidence
 | Child class per weapon, swapped in `DT_ItemInfos` (`/Game/ITR/Configurations/Infos/DT_ItemInfos`, row `FPRItemInfo.ActorClass`) | everything, incl. Mosin lockout by overriding `ExtractRound` (BPA dis 282-291 shows it is overridable) | 36 children + stand-ins per weapon; placed level weapons keep the stock class; only the Mosin lockout needs it. Save-safe: saves hold `UInventoryItem.ItemId` (a tag) and the class comes from the DataTable row by `ItemTypeID` (SDK `IntoTheRadius_classes.hpp:4344-4363`, `IntoTheRadius_structs.hpp:1740-1746`; inferred from the layout, not from a save file). Kept as an optional phase 2 for Mosin/DVL only. |
 | Dispatcher binding alone | observation | runs after the stock handler (ScriptDelegates.h:479-501), cannot suppress |
 | Lua hooks per tick/event | all | slow path, and UE4SS native errors are not caught by pcall (gotchas, T-133/T-146) |
-| aiMod DLL ProcessEvent | all | not shareable |
+| aiMod DLL ProcessEvent | all | not shareable because people shouldn't have to download an additional dll that does proxy dll etc etc |
 
 ## 2. Debounce logic per system (Blueprint terms)
 
@@ -240,7 +240,7 @@ on unregister: if Holding { BoltMoved = false }; if SelfWroteOut and !BoltFullIn
   `F*` (corner feed), `xE` / `xF` (a stock transition the debounce held back). `full` = the action closed since the previous eject.
   Lua (500 ms loop, measurement mode only) prints new lines to UE4SS.log and appends them to `LuaMods/BoltDebounce/measure.csv`.
   `bdb stats`: per class, shortest full-stroke eject-to-eject, shortest held-back interval, count of held-back transitions, suggested N = half the shortest full-stroke interval.
-- Optional aiMod panel (not shareable, the mod does not need it): like the bullet-penetration tab (`aiMod/Menu.cpp:269-345`): buttons send
+- Optional aiMod panel (not shareable because people shouldn't have to download an additional dll that does proxy dll etc etc, the mod does not need it): like the bullet-penetration tab (`aiMod/Menu.cpp:269-345`): buttons send
   `bdb ...` console commands, the panel reads `state.txt` and the tail of `measure.csv` once a second, shows N, the last 8 intervals, the shortest
   full-stroke interval and the suggestion.
 
@@ -282,7 +282,7 @@ on unregister: if Holding { BoltMoved = false }; if SelfWroteOut and !BoltFullIn
 
 ## 9. Open questions
 1. BPGen: binding a dispatcher of another object (`K2Node_AddDelegate` on the hands and on `WeaponBolt`) is untested (SPEC.md:59 says
-   create_delegate is untested). Gate G1 in the brief; fallback is a small `bind` op in the npc-lab BPGen copy. Main to confirm that change is allowed.
+   create_delegate is untested). Gate G1 in the brief; fallback is a small `bind` op in the npc-lab BPGen copy. Main to confirm that change is allowed. ```I don't like npc-lab being a reference as it's not performant and testing only! - grev```
 2. BPGen function stand-ins have inputs only (`ItrShowcaseBPGen.cpp:983-1047`); `Is Going to Jam` needs its output, `BoltState` needs an enum
    variable type. Extend BPGen, or accept that the rare Mosin corner feed skips the jam roll.
 3. ReleaseFraction (end the hold at mid-stroke) is a refinement over a pure time debounce; it keeps fast strokes stock-like. Keep it (default 0.5)?
@@ -300,7 +300,7 @@ on unregister: if Holding { BoltMoved = false }; if SelfWroteOut and !BoltFullIn
 - Base ExtractRound does nothing for an empty chamber: `BP_FirearmItem.dis.txt:828` (off 23185).
 - SDK: `SDK/SDK/IntoTheRadius_classes.hpp:11424-11445` (UWeaponBoltComponent), `:4344-4410` (UInventoryItem), `IntoTheRadius_structs.hpp:1717-1722, 1740-1746`
   (FAmmoContainerData, FPRItemInfo), `VRExpansionPlugin_classes.hpp:302, 341-342, 398-399`.
-- npc-lab stand-ins: `npc-lab/Source/IntoTheRadius/Public/WeaponBoltComponent.h`, `IAmmoContainer.h`; BPGen `npc-lab/Plugins/ItrShowcaseEditor/SPEC.md`,
+- npc-lab stand-ins: `npc-lab/Source/IntoTheRadius/Public/WeaponBoltComponent.h`, `IAmmoContainer.h`; BPGen `npc-lab/Plugins/ItrShowcaseEditor/SPEC.md`  ```I don't like npc-lab being a reference as it's not performant and testing only! - grev```,
   `.../Private/ItrShowcaseBPGen.cpp:480-611, 983-1047`.
 - Delegate order: `C:/ue427/Engine/Source/Runtime/Core/Public/UObject/ScriptDelegates.h:479-501, 559`.
 - Bullet-penetration pattern: `public/itr-common/bullet-penetration/README.md`, `BulletPenetration/Scripts/main.lua`, `build-from-source/`; `docs/agents/where.md:76`.
