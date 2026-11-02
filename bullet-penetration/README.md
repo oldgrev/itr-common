@@ -17,7 +17,7 @@ Or you have a different version you have set up the way you like in which case y
 
 1. Copy [`prebuilt/BulletPenetration_P.pak`](prebuilt/) into `<game>\IntoTheRadius\Content\Paks\~mods\` (create `~mods` if it isn't there).
 2. Copy the [`BulletPenetration`](BulletPenetration/) folder into `<game>\IntoTheRadius\Content\Paks\LuaMods\`. The `enabled.txt` in it turns the mod on.
-3. Start the game. `UE4SS.log` gets one line from the mod: `[BulletPenetration] active`, or `[BulletPenetration] failed: <reason>`.
+3. Start the game. `UE4SS.log` gets one line from the mod: `[BulletPenetration] active`, or `[BulletPenetration] not active yet: <reason>` (it retries at every map load and every 10 s).
 
 ## How it works
 The pak has `BP_PenBulletProjectile` (`/Game/Mods/BulletPenetration/`), which is a biological child of the game's `BP_RadiusBulletProjectile`. We have no idea who the father is, and all we know is that no game asset is overridden.

@@ -22,16 +22,19 @@ local function NameOf(O)
     return Ok and N or nil
 end
 
+-- KismetSystemLibrary:LoadClassAsset_Blocking is not used: with UE4SS c62ada0 it crashed the game (null read at 0x70 inside UE4SS) because the class did not load that way.
+-- If the class cannot be loaded, Apply returns false and the next trigger (map load, new AmmoConfig, the 10 s read-back) tries again; bullets stay stock meanwhile.
 local function LoadClass()
     if Valid(BpClass) then return BpClass end
     BpClass, Cdo = nil, nil
     for _, Fn in ipairs({
         function() return StaticFindObject(BpClassPath) end,
-        function() return LoadAsset(BpAsset) end,
+        -- AssetRegistryHelpers:GetAsset = FindObject, else LoadObject on the object path: loads a pak-only asset. The global LoadAsset of UE4SS c62ada0 goes through the asset registry and does not find it.
         function()
-            local K = StaticFindObject("/Script/Engine.Default__KismetSystemLibrary")
-            return K:LoadClassAsset_Blocking({ AssetPathName = FName(BpClassPath), SubPathString = "" })
+            local Arh = StaticFindObject("/Script/AssetRegistry.Default__AssetRegistryHelpers")
+            return Arh:GetAsset({ ObjectPath = FName(BpClassPath) })
         end,
+        function() return LoadAsset(BpAsset) end,
     }) do
         local Ok, O = pcall(Fn)
         if Ok and Valid(O) and NameOf(O) == BpClassName then BpClass = O break end
@@ -92,16 +95,16 @@ local function Apply()
     return false, "DA_AmmoConfig.BulletClassActor did not take the class"
 end
 
-local Reported = false
+local Reported, FailTold = false, false
 local function Check()
     local R, Why = Apply()
     if R == nil or Reported then return end
     if R then
         Reported = true
         print("[BulletPenetration] active\n")
-    elseif Why then
-        Reported = true
-        print("[BulletPenetration] failed: " .. Why .. "\n")
+    elseif Why and not FailTold then
+        FailTold = true
+        print("[BulletPenetration] not active yet: " .. Why .. " (retrying on the next map load or in 10 s)\n")
     end
 end
 
