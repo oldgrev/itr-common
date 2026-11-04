@@ -72,5 +72,19 @@ do
     Case("quat of yaw 90", math.abs(Q.Z - math.sqrt(0.5)) < 1e-6 and math.abs(Q.W - math.sqrt(0.5)) < 1e-6 and math.abs(Q.X) < 1e-9, string.format("%f %f %f %f", Q.X, Q.Y, Q.Z, Q.W))
 end
 
+-- FromPlace (the console route)
+do
+    local A, Err = Manifest.FromPlace({ name = "ExampleDoor_1", level = "/Game/Mods/ExampleMapDoor/L_ExampleMapDoor", target = "/Game/ITR/Levels/Hub/L_Hub" })
+    Case("place: valid, at the origin", A ~= nil and A.Location[1] == 0 and A.Rotation[2] == 0 and A.Enabled and #A.Hide == 0, Err)
+    local _, E1 = Manifest.FromPlace({ name = "bad name", level = "/Game/Mods/X/L_X", target = "/Game/ITR/Levels/Hub/L_Hub" })
+    Case("place: bad name refused", E1 ~= nil and E1:find("'name'", 1, true) ~= nil, E1)
+    local _, E2 = Manifest.FromPlace({ name = "D", level = "Mods/X", target = "/Game/ITR/Levels/Hub/L_Hub" })
+    Case("place: bad level refused", E2 ~= nil and E2:find("'level'", 1, true) ~= nil, E2)
+    local _, E3 = Manifest.FromPlace({ name = "D", level = "/Game/Mods/X/L_X", target = "Hub" })
+    Case("place: bad target refused", E3 ~= nil and E3:find("'target'", 1, true) ~= nil, E3)
+    local _, E4 = Manifest.FromPlace({ name = "D", level = "/Game/ITR/Levels/Hub/L_Hub", target = "/Game/ITR/Levels/Hub/L_Hub" })
+    Case("place: level equal to target refused", E4 ~= nil and E4:find("same package", 1, true) ~= nil, E4)
+end
+
 print(string.format("%d case(s), %d failed", N, Failed))
 os.exit(Failed == 0 and 0 or 1)

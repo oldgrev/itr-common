@@ -162,6 +162,28 @@ function M.Parse(Text, FileName)
     return A, nil, Warn
 end
 
+-- An add-on asked for by console command ("itraddons place name=<n> level=<pkg> target=<pkg>"): Kv = the key=value words as a table of
+-- strings. Same checks as Parse. The level is placed at the origin (build it in the target level's world coordinates). Returns the add-on
+-- table, or nil and a message.
+function M.FromPlace(Kv)
+    Kv = Kv or {}
+    local A = { File = "itraddons place", Name = Kv.name, Level = Kv.level, Target = Kv.target, Hide = {}, Enabled = true,
+                Location = { 0, 0, 0 }, Rotation = { 0, 0, 0 }, Scale = { 1, 1, 1 } }
+    if type(A.Name) ~= "string" or not A.Name:match("^[%w_%-]+$") then
+        return nil, "place: 'name' must be letters, digits, _ or - (got '" .. tostring(A.Name) .. "')"
+    end
+    if not IsPkg(A.Level) then return nil, "place " .. A.Name .. ": 'level' must be a package path like /Game/Mods/MyAddon/L_MyAddon" end
+    if not IsPkg(A.Target) then return nil, "place " .. A.Name .. ": 'target' must be a stock level package like /Game/ITR/Levels/Hub/L_Hub" end
+    if A.Level:lower() == A.Target:lower() then return nil, "place " .. A.Name .. ": 'level' and 'target' are the same package" end
+    if Kv.notify ~= nil then
+        -- "verb:sub": when the add-on level is shown, the console command "verb sub <entry name>" is run
+        local V, Sub = tostring(Kv.notify):match("^([%w_]+):([%w_]+)$")
+        if not V then return nil, "place " .. A.Name .. ": 'notify' must look like verb:sub (letters, digits, _), got '" .. tostring(Kv.notify) .. "'" end
+        A.Notify = V .. " " .. Sub
+    end
+    return A
+end
+
 -- UE FQuat from pitch / yaw / roll in degrees (the same formula as FRotator::Quaternion)
 function M.Quat(Pitch, Yaw, Roll)
     local D = math.pi / 360

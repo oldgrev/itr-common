@@ -17,9 +17,10 @@ The first target is the Hub. An example add-on (a Hub container room on a roof, 
   of the UE4SS API that plays main menu, Hub, zone transfer, Hub again and a new world
   ([`tests/test_main_sim.lua`](tests/test_main_sim.lua), 18 cases: two add-ons, one broken manifest, debounce, hiding,
   unload, re-entry without a second streaming entry, a level unloaded by another mod).
-- In the game: **not yet**. The streaming call it uses (`LevelStreaming::CreateInstance` on an existing
-  `LevelStreamingDynamic`, then loading it) is the one the map loader's streaming mode uses, which was tested in VR with
-  UE4SS 3.0.1.
+- In the game, November 2026 (vremu, one launch each): the Hub add-on pak of the example loaded and streamed in as add-on
+  levels; **one level streamed twice at two transforms** (two manifests naming the same `level`, one at the origin, one moved
+  300 cm and turned 90 degrees) gave two visible, separate level instances, the second moved and turned about the world origin; and
+  the `itraddons place` command below placed two copies of one level, which stayed once each across a zone and back.
 
 ## Installing
 1. **UE4SS** 3.0.1 (the build in [the loader README](../loader-ue4ss/README.md#installing) works; so does the standard
@@ -96,6 +97,17 @@ The game has no ladder Blueprint: in 2.7.2 a ladder is a static mesh whose colli
 overlaps the `Climbing` channel, which the climbing check uses). `SM_Ladder_Metal_350_01_a` has that profile as its default, and a
 `StaticMeshActor` keeps the mesh's default collision as long as you leave its Collision Presets alone. So placing that mesh
 gives a climbable ladder; changing the ladder's collision preset in the editor breaks climbing.
+
+## Placing an add-on from another mod: `itraddons place`
+Another mod can ask for an add-on level without a manifest file, by console command (values have no spaces):
+```
+itraddons place name=MyAddon_1 level=/Game/Mods/MyMod/L_MyAddon target=/Game/ITR/Levels/Hub/L_Hub x=-33500 y=-2700 z=10 yaw=90
+```
+`name`, `level` and `target` are required and checked like a manifest's; `x`, `y`, `z` (cm) and `yaw` (degrees) default to 0. The
+command adds the same record a manifest does, so streaming, unloading with the target level and re-entry without a second streaming
+entry all work as for any add-on. A name already in use is refused and logged. One level can be placed any number of times under
+different names. The mod announces the command with the shared variable `ITRLevelAddons.Place = 1` (readable by other UE4SS mods
+about 5 seconds after startup). The handler queues no game-thread work, so it is safe to call from inside another mod's action.
 
 ## How it works
 Once a second (`PollMs` in `config.lua`), on the game thread:

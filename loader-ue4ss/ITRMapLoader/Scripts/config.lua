@@ -7,12 +7,18 @@
 -- each copy its own map, trigger (NativeTriggerMesh / Key) and ConsoleCommand, and enable both in mods.txt.
 --
 -- Every key below except Maps is optional; the value shown is the default.
+-- Regions: the Regions page on the Hub's mission computer (regions.lua) is started by the copy installed in a folder called ITRMapLoader.
+-- A renamed copy does not start a second page; Regions = true / false overrides. A Regions-only install uses Maps = {} and Key = false.
+-- Regions = nil,
+-- Forms = nil,   -- read the map forms in Content/Paks/ITRMaps: the copy installed as ITRMapLoader does; true / false overrides.
 return {
     Maps = {
         {
             -- ---- Which map ----
             -- Name: short name of the map. Also picks the loot manifest file (Scripts/<Name>.loot.json) and names the map in the log.
             Name = "Example",
+            -- Regions: true = this map is listed on the Hub computer's REGIONS page (the page is only touched when some map asks). Default: not listed.
+            Regions = true,
             -- Level: the level package as cooked, under /Game/Mods/. The last part is the world's name and must match the
             -- .umap file name; it becomes the level's "main sublevel" the game looks up by name.
             Level = "/Game/Mods/Example/L_Example",

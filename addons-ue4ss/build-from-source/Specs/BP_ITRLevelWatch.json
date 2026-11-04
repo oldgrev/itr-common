@@ -1,0 +1,57 @@
+{
+  "once": true,
+  "_doc": "ITRLevelAddons' level watcher: logic only. No mesh, no collision, no component, no tick, no timer. ITRLevelAddons spawns one per watched streaming entry and calls Watch(Entry, Id). Watch stores both and binds the entry's OnLevelShown and OnLevelHidden (ULevelStreaming, both no-parameter multicast delegates in UE 4.27) to two custom events. Each runs the console command 'itraddons shown <Id>' or 'itraddons hidden <Id>', so ITRLevelAddons' Lua runs only when a level really appears or goes. The helper lives in the persistent level; ITRLevelAddons destroys it when its world goes. Nothing in the author's levels is touched.",
+  "asset": "/Game/Mods/ITRLevelAddons/BP_ITRLevelWatch",
+  "parent": "/Script/Engine.Actor",
+  "components": [],
+  "variables": [
+    {"name": "Entry", "type": "object:/Script/Engine.LevelStreaming"},
+    {"name": "Id", "type": "string", "default": ""}
+  ],
+  "cdo": {
+    "PrimaryActorTick": "(bCanEverTick=False)"
+  },
+  "nodes": [
+    {"id": "watch", "op": "custom_event", "name": "Watch", "params": [{"name": "WatchedEntry", "type": "object:/Script/Engine.LevelStreaming"}, {"name": "WatchId", "type": "string"}]},
+    {"id": "setEntry", "op": "set", "var": "Entry"},
+    {"id": "setId", "op": "set", "var": "Id"},
+    {"id": "dlShown", "op": "create_delegate", "function": "Shown"},
+    {"id": "bindShown", "op": "node", "class": "K2Node_AddDelegate", "props": {"DelegateReference": "(MemberParent=Class'/Script/Engine.LevelStreaming',MemberName=\"OnLevelShown\")"}},
+    {"id": "dlHidden", "op": "create_delegate", "function": "Hidden"},
+    {"id": "bindHidden", "op": "node", "class": "K2Node_AddDelegate", "props": {"DelegateReference": "(MemberParent=Class'/Script/Engine.LevelStreaming',MemberName=\"OnLevelHidden\")"}},
+
+    {"id": "shown", "op": "custom_event", "name": "Shown"},
+    {"id": "meS", "op": "self"},
+    {"id": "idS", "op": "get", "var": "Id"},
+    {"id": "catS", "op": "call", "function": "KismetStringLibrary:Concat_StrStr", "pins": {"A": "itraddons shown "}},
+    {"id": "runS", "op": "call", "function": "KismetSystemLibrary:ExecuteConsoleCommand"},
+
+    {"id": "hidden", "op": "custom_event", "name": "Hidden"},
+    {"id": "meH", "op": "self"},
+    {"id": "idH", "op": "get", "var": "Id"},
+    {"id": "catH", "op": "call", "function": "KismetStringLibrary:Concat_StrStr", "pins": {"A": "itraddons hidden "}},
+    {"id": "runH", "op": "call", "function": "KismetSystemLibrary:ExecuteConsoleCommand"}
+  ],
+  "links": [
+    ["watch.then", "setEntry.execute"],
+    ["watch.WatchedEntry", "setEntry.Entry"],
+    ["setEntry.then", "setId.execute"],
+    ["watch.WatchId", "setId.Id"],
+    ["setId.then", "bindShown.execute"],
+    ["watch.WatchedEntry", "bindShown.self"],
+    ["dlShown.OutputDelegate", "bindShown.delegate"],
+    ["bindShown.then", "bindHidden.execute"],
+    ["watch.WatchedEntry", "bindHidden.self"],
+    ["dlHidden.OutputDelegate", "bindHidden.delegate"],
+
+    ["shown.then", "runS.execute"],
+    ["idS.Id", "catS.B"],
+    ["catS.ReturnValue", "runS.Command"],
+    ["meS.self", "runS.WorldContextObject"],
+
+    ["hidden.then", "runH.execute"],
+    ["idH.Id", "catH.B"],
+    ["catH.ReturnValue", "runH.Command"],
+    ["meH.self", "runH.WorldContextObject"]
+  ]
+}

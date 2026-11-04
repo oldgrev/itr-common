@@ -57,6 +57,9 @@ local StagingMaxWestX = Config.StagingMaxWestX or -20000
 -- every LoopAsync tick runs its game-thread callback on time (it did not).
 local function Now() return os.clock() * 1000 end
 
+-- RULE (UE4SS c62ada0): never call ExecuteInGameThread from inside a game-thread action, or from anything an action calls synchronously.
+-- Appending to its queue can reallocate it under the running pass and crash the game. Calling it from a hook, NotifyOnNewObject, a key
+-- bind, LoopAsync or ExecuteWithDelay is fine, as long as that caller is not itself inside an action.
 -- Runs fn on the game thread every ms until it returns true (or throws). LoopAsync runs on another thread, so the
 -- stop flag is only seen one round after the game thread set it. The flag lives in a table (shared by reference).
 -- IMPORTANT (UE4SS c62ada0): errors raised by UE4SS's functions (TMap:Find on a missing key, calling an invalid UFunction
@@ -343,13 +346,29 @@ local function ChooseArrival(Map, M)
     return M.Start
 end
 
+-- The exit watch (ExitWatchTick, defined near the end of this file) runs only while a map with exit markers is loaded: standing near
+-- a plain TargetPoint raises no event, so this is a check twice a second, started here and ended when the map is gone.
+local ExitWatchTick = nil
+local ExitWatching = false
 local function ArmExits(M)
+    if Current.Map.FromForm then            -- a form map leaves through its exit triggers (bound on arrival): no marker watch, no timer
+        Current.Exits = {}
+        return
+    end
     Current.Exits = M.Exits
     if #M.Exits > 0 then
         local Ids = {}
         for _, E in ipairs(M.Exits) do table.insert(Ids, E.Id or "-") end
         Log("%d exit marker(s) (ids: %s)", #M.Exits, table.concat(Ids, ", "))
         for _, E in ipairs(M.Exits) do Log("exit point %s at (%.0f, %.0f, %.0f)", E.Id or "-", E.X, E.Y, E.Z) end
+        if not ExitWatching then
+            ExitWatching = true
+            Every(500, function()
+                local Done = ExitWatchTick()
+                if Done then ExitWatching = false end
+                return Done
+            end)
+        end
     end
 end
 
@@ -791,6 +810,39 @@ local function RepointOwnTables(Map, ToDonor)
     return N
 end
 
+-- Append loaded assets to GameInstance.ReferencedObjects (a UPROPERTY TArray<UObject*> of the game instance: the garbage collector walks it and the
+-- instance lives for the whole session). UE4SS Lua has no AddToRoot. Returns true, count after | false, reason.
+local function KeepAssetsAlive(Objs)
+    local GI = nil
+    pcall(function() if UEHelpers.GetGameInstance then GI = UEHelpers.GetGameInstance() end end)
+    if not Valid(GI) then
+        local Ok, F = pcall(FindFirstOf, "GameInstance")
+        if Ok and Valid(F) then GI = F end
+    end
+    if not Valid(GI) then return false, "no GameInstance yet" end
+    local Ok, Arr = pcall(function() return GI.ReferencedObjects end)
+    if not Ok or Arr == nil then return false, "GameInstance.ReferencedObjects is not readable" end
+    local Before = Arr:GetArrayNum()
+    for _, O in ipairs(Objs) do
+        local Ok2, Err = pcall(function()
+            local N = Arr:GetArrayNum()
+            local _ = Arr[N + 1]                 -- an index past the end grows a TArray by one zeroed element in UE4SS c62ada0
+            Arr[N + 1] = O
+        end)
+        if not Ok2 then return false, "could not append to ReferencedObjects: " .. tostring(Err) end
+    end
+    local Want = {}
+    for _, O in ipairs(Objs) do Want[O:GetAddress()] = true end
+    local After, Found = Arr:GetArrayNum(), 0
+    if After - Before ~= #Objs then return false, string.format("ReferencedObjects grew by %d, expected %d", After - Before, #Objs) end
+    for I = Before + 1, After do      -- read back only the tail that was written, by address
+        local Ok3, O = pcall(function() return Arr[I] end)
+        if Ok3 and Valid(O) and Want[O:GetAddress()] then Found = Found + 1 end
+    end
+    if Found ~= #Objs then return false, string.format("only %d of %d assets read back from ReferencedObjects", Found, #Objs) end
+    return true, After
+end
+
 local function RegisterLootTags(Map, Manifest)
     if not Manifest then return 0 end
     local C = LootCtxOf(Map)
@@ -830,15 +882,20 @@ local function RegisterLootTags(Map, Manifest)
                 else
                     local Table = Donor.LootTable
                     local OwnTable = nil
-                    if type(T.table_asset) == "string" and T.table_asset ~= "" and not C.Native then
-                        OwnTable = R.Held[T.table_name or ""]
-                        if OwnTable then
-                            LogOnce("held", "loot: custom tables come from the map's table holder (%d table(s))", R.HeldN)
-                        else
+                    if type(T.table_asset) == "string" and T.table_asset ~= "" then
+                        if C.Native then
+                            -- native maps: the table is loaded now and kept alive for the session (below), so no holder actor is needed
                             OwnTable = LoadOwnTable(T.table_asset)
+                        else
+                            OwnTable = R.Held[T.table_name or ""]
                             if OwnTable then
-                                Log("loot: tag %s: table %s is NOT held by the map (no %s actor): nothing keeps it alive in Lua", Tag,
-                                    tostring(T.table_asset), HolderClassOf(Map))
+                                LogOnce("held", "loot: custom tables come from the map's table holder (%d table(s))", R.HeldN)
+                            else
+                                OwnTable = LoadOwnTable(T.table_asset)
+                                if OwnTable then
+                                    Log("loot: tag %s: table %s is NOT held by the map (no %s actor): nothing keeps it alive in Lua", Tag,
+                                        tostring(T.table_asset), HolderClassOf(Map))
+                                end
                             end
                         end
                     end
@@ -896,6 +953,24 @@ local function RegisterLootTags(Map, Manifest)
                         end
                     end
                 end
+            end
+        end
+    end
+    if C.Native then
+        -- the map's tables stay loaded for the session: unique objects by address
+        local Objs, Seen = {}, {}
+        for _, O in pairs(C.KeepAlive) do
+            local Ok, A = pcall(function() return O:GetAddress() end)
+            if Ok and not Seen[A] then Seen[A] = true; Objs[#Objs + 1] = O end
+        end
+        if #Objs > 0 then
+            local OkK, Info = KeepAssetsAlive(Objs)
+            Log("loot: %d custom loot table(s) kept alive in GameInstance.ReferencedObjects (%s)", #Objs, OkK and ("array now " .. tostring(Info)) or ("FAILED: " .. tostring(Info)))
+            if not OkK then
+                -- a table left in LootArray with nothing referencing it is collected and read later (access violation): point the entries back at the donor tables
+                C.Manifest = Manifest
+                RepointOwnTables(Map, true)
+                Log("loot: the entries point at the donor tables instead")
             end
         end
     end
@@ -1373,19 +1448,22 @@ end
 -- by the startup guard below when the registration failed.
 local NativeState = { Ready = false, Failed = nil, RowDone = false, CenterDone = false, LootDone = false, WorldAddr = nil,
                       Entry = nil, Map = nil, Tag = nil, Sub = nil, RowFill = nil, Checks = 0, Logged = {} }
-local NativeTrip = nil       -- the current native transfer in progress { Map, T0, Phase }
--- Loot tables: the map's own DataTables must never sit in GameConfig.LootArray while nothing keeps them
--- alive. GameConfig is loaded at engine start (GC does not walk its references), so a table referenced only from LootArray is
--- collected and ItemsManager::GetLootForTable later reads the dead pointer (access violation). The tags are
--- registered on the donor (stock) tables; while the map's level is loaded, its table holder keeps the map's
--- tables alive and the entries point at them; before the level goes they point back at the donor tables.
-local NativeLootOwn = false
-
-local function NativeMap()
-    for _, M in ipairs(Config.Maps) do
-        if Opt(M, "Native", true) then return M end
-    end
-    return nil
+local NativeTrip = nil       -- the current native transfer in progress { Map, T0, Phase, Return }
+-- One record per native map (config maps and form maps). NativeState points at the record being worked on: every entry point selects the
+-- record of its map first (NativeSelect), then the functions below read and write it as they always did.
+local NativeList, NativeBy = {}, {}
+local Maps = nil             -- maps.lua (form maps), set at the end of this file
+local function NativeNew(Map)
+    local N = { Ready = false, Failed = nil, RowDone = false, CenterDone = false, LootDone = false, WorldAddr = nil,
+                Entry = nil, Map = Map, Tag = nil, Sub = nil, RowFill = nil, Checks = 0, Logged = {} }
+    table.insert(NativeList, N)
+    NativeBy[Map] = N
+    return N
+end
+local function NativeSelect(Map)
+    local N = Map and NativeBy[Map] or nil
+    if N then NativeState = N end
+    return N
 end
 
 local function NativeTagOf(Map) return Map.NativeTag or ("Level.Zone." .. Map.Name) end
@@ -1790,16 +1868,16 @@ local function NativeRegisterTick()
 end
 
 -- Arrival transform for the save slot the game reads first (PlayerGameData position for the level)
-local function NativeStartTransform(Map)
-    local S = Opt(Map, "NativeStart", nil)
+local function NativeStartTransform(Map, Override)
+    local S = Override or Opt(Map, "NativeStart", nil)
     if type(S) ~= "table" then return nil end
     local Yaw = math.rad(tonumber(S.Yaw) or 0) / 2
     return { Rotation = { X = 0, Y = 0, Z = math.sin(Yaw), W = math.cos(Yaw) },
              Translation = { X = S.X or 0, Y = S.Y or 0, Z = S.Z or 0 }, Scale3D = { X = 1, Y = 1, Z = 1 } }
 end
 
-local function NativeSavePosition(Map)
-    local T = NativeStartTransform(Map)
+local function NativeSavePosition(Map, Override)
+    local T = NativeStartTransform(Map, Override)
     if not T then return false end
     local GD = GetGameData()
     if not GD then return false end
@@ -1807,12 +1885,17 @@ local function NativeSavePosition(Map)
     return Ok
 end
 
--- Enter the map through the game's level transfer. Returns true when the game accepted the transfer.
+local TryArrive = nil        -- defined in the level-event block below (it needs the trigger hook)
+
+-- Enter the map through the game's level transfer. Returns true when the game accepted the transfer. The arrival is finished by
+-- TryArrive, from the game's level events (OnLevelStarted / OnTransitionEnd), and once more by a one-shot check after 15 s.
 local function NativeEnter(Map, Why)
+    if NativeTrip and Now() - NativeTrip.T0 > 200000 then NativeTrip = nil end       -- a stale record never blocks for good
     if NativeTrip then
         Log("native: %s ignored: a transfer is already running", Why)
         return false
     end
+    NativeSelect(Map)
     if not NativeState.Ready then
         Log("native: %s: not registered (%s)", Why, NativeState.Failed or "registration not finished")
         return false
@@ -1831,81 +1914,28 @@ local function NativeEnter(Map, Why)
         return false
     end
     local Tag = NativeState.Tag
-    local Saved = NativeSavePosition(Map)
+    local Return = Maps and Maps.ReturnStart(Map) or nil
+    local Saved = NativeSavePosition(Map, Return)
+    if not Saved and Map.FromForm then
+        Log("map %s: no start in the form: the game picks the arrival, then the loader moves the player to the level's start marker", Map.Name)
+    end
     Log("native: %s: calling TransferToLevel(%s) on %s (arrival position %s)", Why, Tag, GM:GetFName():ToString(),
-        Saved and "saved for the level" or "from the game")
+        Return and "the return point" or (Saved and "saved for the level" or "from the game"))
     local Res, Err = CallTransfer(GM, Tag, "None")
     Log("native: %s: TransferToLevel(%s) -> %s", Why, Tag, Err or tostring(Res))
     if Res ~= true then return false end
-    NativeTrip = { Map = Map, T0 = Now(), Phase = "transfer", SeenTransition = false }
-    local Trip = NativeTrip
-    Every(100, function()
-        if NativeTrip ~= Trip then return true end
-        local Ms = Now() - Trip.T0
-        local GMn = GetGameMode()
-        local InTr = InTransition(GMn)
-        if InTr then Trip.SeenTransition = true end
-        local LevelNow = LevelTagNow()
-        local LM = GetLevelManager()
-        local LMReady = LM and LM:IsReady() or false
-        -- the game's DoSavePlayerPosition overwrites the single saved position while not in transition; keep ours in place
-        -- until the level start has read it
-        if LevelNow ~= Tag or InTr or not LMReady then NativeSavePosition(Map) end
-        -- the map's level is in memory: its table holder keeps the own loot tables alive, so point the entries at them now
-        -- (before the level's loot nodes roll; until then the entries hold the stock donor tables, which never go away)
-        if not Trip.LootDone then
-            local W = UEHelpers.GetWorld()
-            local S = Valid(W) and FindNativeEntry(W, NativeState.Sub) or nil
-            if S and CallBool(S, "IsLevelLoaded") then
-                Trip.LootDone = true
-                local OkR, NR = pcall(RepointOwnTables, Map, false)
-                NativeLootOwn = OkR and (NR or 0) > 0
-                Log("native: level loaded after %.1f s; own loot tables %s", Ms / 1000,
-                    NativeLootOwn and ("in use (" .. tostring(NR) .. " entries)") or "not available, donor tables kept")
-            end
-        end
-        if (LevelNow == Tag or (LevelNow == nil and Trip.SeenTransition)) and not InTr and LMReady then
-            local World = UEHelpers.GetWorld()
-            local Stream = Valid(World) and FindNativeEntry(World, NativeState.Sub) or nil
-            if not (Stream and CallBool(Stream, "IsLevelVisible")) then
-                if Ms > 180000 then
-                    Log("native: level tag is %s but the map's level is not visible after %.0f s", Tag, Ms / 1000)
-                    NativeTrip = nil
-                    return true
-                end
-                return false
-            end
-            local L = PawnLoc()
-            local M = ScanMarkers(Map, Stream)
-            local Want = ChooseArrival(Map, M)
-            Log("native: arrived after %.1f s (transition seen %s): level %s, player at %s, %d TargetPoint(s), start marker %s",
-                Ms / 1000, tostring(Trip.SeenTransition), LevelNow, L and FmtV(L) or "?", #M.All, M.Start and "found" or "MISSING")
-            if Want and L and Dist3D(L, Want.Loc) > Opt(Map, "NativeArriveTolerance", 3000) then
-                Log("native: the game placed the player %.0f m from the arrival marker; moving them there", Dist3D(L, Want.Loc) / 100)
-                TeleportPlayer(Want.Loc, Want.Rot, "arrival marker")
-            end
-            Current = { Map = Map, Stream = Stream, Return = nil, Phase = "active", Exits = {}, Native = true }
-            ArmExits(M)
-            NativeTrip = nil
-            return true
-        end
-        if Ms > 180000 then
-            Log("native: transfer did not finish within 180 s (level %s, in transition %s, level manager ready %s)",
-                tostring(LevelNow), tostring(InTr), tostring(LMReady))
-            NativeTrip = nil
-            return true
-        end
-        return false
+    local Trip = { Map = Map, T0 = Now(), Phase = "transfer", Return = Return }
+    NativeTrip = Trip
+    ExecuteWithDelay(15000, function()
+        ExecuteInGameThread(function()
+            if NativeTrip == Trip and TryArrive then TryArrive() end
+        end)
     end)
     return true
 end
 
--- Leave the map through the game's level transfer (to HubLevelTag)
+-- Leave the map through the game's level transfer (to HubLevelTag). Being back is noticed by TryBack, from the level events.
 local function NativeExit(Why)
-    if NativeLootOwn then
-        pcall(RepointOwnTables, Current.Map, true)
-        NativeLootOwn = false
-    end
     local GM = GetGameMode()
     local Res, Err = CallTransfer(GM, HubLevelTag, Config.NativeExitLocation or "None")
     Log("native exit (%s): TransferToLevel(%s) -> %s", Why, HubLevelTag, Err or tostring(Res))
@@ -1913,25 +1943,6 @@ local function NativeExit(Why)
         Current.Phase = "active"
         return
     end
-    local T0w = Now()
-    Every(500, function()
-        if not Current or not Current.Native then return true end
-        local LevelNow = LevelTagNow()
-        local LM = GetLevelManager()
-        local World = UEHelpers.GetWorld()
-        local Back = LevelNow == HubLevelTag or (LevelNow == nil and Valid(World) and IsHubVisible(World))
-        if Back and LM and LM:IsReady() and not InTransition() then
-            Log("native exit: back in %s after %.1f s", HubLevelTag, (Now() - T0w) / 1000)
-            Current = nil
-            return true
-        end
-        if Now() - T0w > 180000 then
-            Log("native exit: not back in %s after 180 s (level %s)", HubLevelTag, tostring(LevelNow))
-            Current = nil
-            return true
-        end
-        return false
-    end)
 end
 
 -- Pickup trigger (config NativeTriggerMesh = the name of a Hub item's static mesh): grabbing a Hub prop with that mesh starts the
@@ -1942,10 +1953,6 @@ end
 local TriggerHooked = false
 local TriggerLastMs = -1e9
 local function NativeTriggerGrab(Context)
-    local Map = NativeState.Map
-    if not Map then return end
-    local Want = Opt(Map, "NativeTriggerMesh", nil)
-    if not Want then return end
     local Ok, MeshName = pcall(function()
         local A = Context:get()
         if not Valid(A) then return nil end
@@ -1953,7 +1960,13 @@ local function NativeTriggerGrab(Context)
         if not Valid(M) then return nil end
         return M:GetFName():ToString()
     end)
-    if not Ok or MeshName ~= Want then return end
+    if not Ok or not MeshName then return end
+    local Map = nil
+    for _, N in ipairs(NativeList) do
+        if Opt(N.Map, "NativeTriggerMesh", nil) == MeshName then Map = N.Map; NativeState = N; break end
+    end
+    if not Map then return end
+    local Want = MeshName
     local T = Now()
     if T - TriggerLastMs < 10000 then return end            -- debounce: one transfer per grab, 10 s apart
     TriggerLastMs = T
@@ -1975,8 +1988,16 @@ end
 
 local function NativeHookTrigger()
     if TriggerHooked then return end
-    local Map = NativeState.Map
-    if not Map or not Opt(Map, "NativeTriggerMesh", nil) then TriggerHooked = true; return end
+    local Map = nil
+    for _, N in ipairs(NativeList) do
+        if N.Ready and Opt(N.Map, "NativeTriggerMesh", nil) then Map = N.Map; NativeState = N; break end
+    end
+    if not Map then
+        local Any = false
+        for _, N in ipairs(NativeList) do if Opt(N.Map, "NativeTriggerMesh", nil) then Any = true end end
+        if not Any then TriggerHooked = true end          -- no map asks for an item trigger: the hook is never made
+        return
+    end
     local Path = Opt(Map, "NativeTriggerFunction", "/Game/ITR/BPs/Items/BP_PhysicsActor.BP_PhysicsActor_C:OnGrip")
     local Ok, F = pcall(StaticFindObject, Path)
     if not Ok or not Valid(F) then
@@ -1992,86 +2013,209 @@ local function NativeHookTrigger()
         tostring(Opt(Map, "NativeTriggerMesh", nil)), Map.Name, OkH and "registered" or ("FAILED " .. tostring(Err)))
 end
 
--- Re-entry of the map by the game itself (fog wall / tide / death reload = IPRGameMode::ReEnterCurrentLevel, no NativeEnter):
--- the level is unloaded and loaded again behind the transition screen. Its table holder goes with the old level, so the own
--- loot entries move back to the donor tables as soon as the transition starts (before the old tables can be collected) and
--- to the new level's holder as soon as the level is loaded again (before its loot nodes roll), as NativeEnter does.
-local NativeReturn = nil     -- { T0 } while waiting for the map's level to come back
-local function NativeReentryWatch(Map)
-    Every(100, function()
-        if NativeTrip then return false end
-        if NativeLootOwn and Current and Current.Native and InTransition() then
-            pcall(RepointOwnTables, Map, true)
-            NativeLootOwn = false
-            NativeReturn = { T0 = Now() }
-            Log("native: a transition started while the map is loaded (fog / tide / death / gate); loot entries back on the donor tables")
-            return false
-        end
-        if NativeReturn then
-            local LevelNow = LevelTagNow()
-            if LevelNow and LevelNow ~= NativeState.Tag and not InTransition() then
-                Log("native: the transition left the map (level now %s)", LevelNow)
-                NativeReturn = nil
-                return false
-            end
-            local W = UEHelpers.GetWorld()
-            local S = Valid(W) and FindNativeEntry(W, NativeState.Sub) or nil
-            if LevelNow == NativeState.Tag and S and CallBool(S, "IsLevelLoaded") then
-                local OkR, NR = pcall(RepointOwnTables, Map, false)
-                NativeLootOwn = OkR and (NR or 0) > 0
-                Log("native: the map's level is back after %.1f s (re-entered by the game); own loot tables %s", (Now() - NativeReturn.T0) / 1000,
-                    NativeLootOwn and ("in use (" .. tostring(NR) .. " entries)") or "not available, donor tables kept")
-                NativeReturn = nil
-                if Current then Current.Stream = S end
-            elseif Now() - NativeReturn.T0 > 180000 then
-                Log("native: the map's level did not come back within 180 s (level %s)", tostring(LevelNow))
-                NativeReturn = nil
-            end
+---------------------------------------------------------------------------------------------------------------------
+-- Level events (replace the timed watches). The game mode announces level changes with Blueprint events; they are hooked once, one tick
+-- after the first PRGameMode object exists (a Blueprint function cannot be hooked at mod start: UFunction::Func is still 0x0 and the
+-- error ends the whole mod). Script hooks run only the first callback given to RegisterHook.
+---------------------------------------------------------------------------------------------------------------------
+local GM_CLASS = "/Game/ITR/BPs/Game/BP_PRGameMode.BP_PRGameMode_C"
+local function LevelReady()   -- level manager idle, not in transition
+    local LM = GetLevelManager()
+    return LM ~= nil and (Config.RequireLevelManagerReady == false or LM:IsReady()) and not InTransition()
+end
+local function ResavePosition() if NativeTrip then NativeSavePosition(NativeTrip.Map) end end
+
+-- Arrival: the level is the map's, visible, and the level manager is idle. Returns true when done or not applicable.
+TryArrive = function()
+    local Trip = NativeTrip
+    if not Trip then return true end
+    if not LevelReady() then return false end
+    local Map = Trip.Map
+    NativeSelect(Map)
+    local LevelNow = LevelTagNow()
+    if LevelNow ~= nil and LevelNow ~= NativeState.Tag then
+        if Now() - Trip.T0 > 120000 then
+            Log("native: the transfer ended in %s, not %s", LevelNow, NativeState.Tag)
+            NativeTrip = nil
+            return true
         end
         return false
-    end, 30)
+    end
+    local World = UEHelpers.GetWorld()
+    local Stream = Valid(World) and FindNativeEntry(World, NativeState.Sub) or nil
+    if not (Stream and CallBool(Stream, "IsLevelVisible")) then return false end
+    local Ms = Now() - Trip.T0
+    local L = PawnLoc()
+    local M = ScanMarkers(Map, Stream)
+    local Want = ChooseArrival(Map, M)
+    local R = Trip.Return
+    if R then
+        Want = { Loc = { X = R.X, Y = R.Y, Z = R.Z }, Rot = { Pitch = 0, Yaw = R.Yaw, Roll = 0 } }       -- the return point, not the start marker
+    end
+    Log("native: arrived after %.1f s: level %s, player at %s, %d TargetPoint(s), start marker %s",
+        Ms / 1000, tostring(LevelNow), L and FmtV(L) or "?", #M.All, M.Start and "found" or "MISSING")
+    if Want and L and Dist3D(L, Want.Loc) > Opt(Map, "NativeArriveTolerance", 3000) then
+        Log("native: the game placed the player %.0f m from the arrival marker; moving them there", Dist3D(L, Want.Loc) / 100)
+        TeleportPlayer(Want.Loc, Want.Rot, "arrival marker")
+    end
+    Current = { Map = Map, Stream = Stream, Return = nil, Phase = "active", Exits = {}, Native = true }
+    ArmExits(M)
+    NativeTrip = nil
+    if Maps and Map.FromForm then Maps.OnArrived(Map) end
+    return true
 end
 
--- Background: registration, then a light watch (left the map another way: death, fog, gate)
-local function NativeStartup()
-    local Map = NativeMap()
-    if not Map then return end
-    NativeState.Map, NativeState.Tag, NativeState.Sub = Map, NativeTagOf(Map), NativeSubOf(Map)
-    Log("native: registering %s as %s (main sublevel %s) once the game is idle", Map.Name, NativeState.Tag, NativeState.Sub)
-    NativeReentryWatch(Map)
-    Every(1000, function()
-        NativeRegisterTick()
-        if NativeState.Ready and not TriggerHooked then NativeHookTrigger() end
-        if NativeState.Failed then
-            NativeLogOnce("failed", "native: registration FAILED (%s); %s", NativeState.Failed,
-                Opt(Map, "NativeFallback", false) and "entry falls back to the streaming loader" or "map entry is off this session")
-            -- startup guard: a save made in the level must not strand the player when the level cannot be registered
-            local GD = GetGameData()
-            if GD and LevelTagNow() == NativeState.Tag then
-                local Ok = pcall(function() GD.CurrentLevelTag = TagStruct(HubLevelTag) end)
-                Log("native: the loaded save is in %s, which is not registered: moved to %s: %s", NativeState.Tag, HubLevelTag,
-                    Ok and "done" or "FAILED")
+-- After a native exit: back in the Hub and the level manager idle
+local function TryBack()
+    if not (Current and Current.Native and Current.Phase == "exiting") then return end
+    local LevelNow, World = LevelTagNow(), UEHelpers.GetWorld()
+    local Back = LevelNow == HubLevelTag or (LevelNow == nil and Valid(World) and IsHubVisible(World))
+    if Back and LevelReady() then
+        Log("native exit: back in %s", HubLevelTag)
+        Current = nil
+    end
+end
+
+-- The game moved the player out of the map another way (death, fog, gate)
+local function NoteLeft()
+    if Current and Current.Native and Current.Phase == "active" and not NativeTrip then
+        NativeSelect(Current.Map)
+        local LevelNow = LevelTagNow()
+        if LevelNow and LevelNow ~= NativeState.Tag and not InTransition() then
+            Log("native: the game left the map another way (level now %s); exits disarmed", LevelNow)
+            Current = nil
+        end
+    end
+end
+
+-- One pass of what the old 1 s tick did: registration (waits for an idle level manager), the Hub item hook, the failed-registration guard
+local function NativeAttempt()
+    if Maps then Maps.CheckInstalled() end
+    for _, N in ipairs(NativeList) do
+        NativeState = N
+        if N.Map.Missing and not N.Failed then N.Failed = "level not installed" end
+        if N.Map.Missing then
+            -- a map whose level is not installed is not registered and not listed; Maps logged it once
+        else
+            NativeRegisterTick()
+            if NativeState.Ready and not TriggerHooked then NativeHookTrigger() end
+            if NativeState.Failed then
+                NativeLogOnce("failed", "native: registration FAILED (%s); %s", NativeState.Failed,
+                    Opt(NativeState.Map, "NativeFallback", false) and "entry falls back to the streaming loader" or "map entry is off this session")
+                -- startup guard: a save made in the level must not strand the player when the level cannot be registered
+                local GD = GetGameData()
+                if GD and LevelTagNow() == NativeState.Tag then
+                    local Ok = pcall(function() GD.CurrentLevelTag = TagStruct(HubLevelTag) end)
+                    Log("native: the loaded save is in %s, which is not registered: moved to %s: %s", NativeState.Tag, HubLevelTag, Ok and "done" or "FAILED")
+                end
             end
         end
-        if NativeLootOwn and not NativeTrip then
-            local W = UEHelpers.GetWorld()
-            local S = Valid(W) and FindNativeEntry(W, NativeState.Sub) or nil
-            if not (S and CallBool(S, "IsLevelLoaded")) then
-                pcall(RepointOwnTables, Map, true)
-                NativeLootOwn = false
-                Log("native: the map's level is gone; loot entries back on the donor tables")
-                if Current and Current.Native and not NativeReturn then NativeReturn = { T0 = Now() } end   -- a game re-entry may follow
+    end
+end
+
+-- A save made in a map (NativeSaves on) loads the map's level through the game's own Continue: no transfer was started here, so this adopts it as
+-- the Showcase loader does: exits armed (for a form map: its exit triggers bound), a guard against a bad saved position. Called from the level events.
+local function NativeGuardPosition(Map, S)
+    ExecuteWithDelay(3500, function()
+        ExecuteInGameThread(function()
+            if not (Current and Current.Map == Map) then return end
+            local L = PawnLoc()
+            if not L then return end
+            local C = Opt(Map, "NativeCenter", { X = 0, Y = 0, Z = 0 })
+            local Far = Dist2D(L, { X = C.X or 0, Y = C.Y or 0 }) > Opt(Map, "NativeRadius", 250000)
+            local Falling = OnMapGround(S) ~= true and L.Z < -50000
+            if Far or Falling then
+                local M = Valid(S) and ScanMarkers(Map, S) or nil
+                local Want = M and ChooseArrival(Map, M) or nil
+                Log("native: saved position %s is %s; moving the player to the arrival marker", FmtV(L), Far and "outside the map" or "falling")
+                if Want then TeleportPlayer(Want.Loc, Want.Rot, "arrival marker (bad saved position)") end
+            end
+        end)
+    end)
+end
+local function NativeAdopt()
+    if Current or NativeTrip then return end
+    for _, N in ipairs(NativeList) do
+        if N.Ready then
+            local World = UEHelpers.GetWorld()
+            local S = Valid(World) and FindNativeEntry(World, N.Sub) or nil
+            if S and CallBool(S, "IsLevelVisible") then
+                NativeState = N
+                if LevelTagNow() == N.Tag and not InTransition() then
+                    local Map = N.Map
+                    local M = ScanMarkers(Map, S)
+                    local L = PawnLoc()
+                    Log("native: the game loaded %s itself (a save made in the map); player at %s, %d TargetPoint(s); exits armed", N.Tag, L and FmtV(L) or "?", #M.All)
+                    Current = { Map = Map, Stream = S, Return = nil, Phase = "active", Exits = {}, Native = true }
+                    ArmExits(M)
+                    NativeGuardPosition(Map, S)
+                    if Maps and Map.FromForm then Maps.OnArrived(Map) end
+                    return
+                end
             end
         end
-        if Current and Current.Native and Current.Phase == "active" and not NativeTrip then
-            local LevelNow = LevelTagNow()
-            if LevelNow and LevelNow ~= NativeState.Tag and not InTransition() then
-                Log("native: the game left the map another way (level now %s); exits disarmed", LevelNow)
-                Current = nil
-            end
-        end
-        return false
-    end, 30)
+    end
+end
+
+local function OnLevelSettled(What)
+    ExecuteInGameThread(function()
+        NativeAttempt()
+        TryBack()
+        NoteLeft()
+        if NativeTrip and not TryArrive() then Log("native: %s: level not ready yet", What) end
+        NativeAdopt()
+    end)
+end
+
+local LevelHooksAsked = false
+-- Runs as ONE game-thread action. Never call ExecuteInGameThread in here, or in anything it calls synchronously: appending to UE4SS's
+-- queue from inside an action can reallocate it under the running pass (c62ada0) and crash the game. A failing RegisterHook ends the
+-- rest of this action: the log shows how far it got.
+local function AttachLevelHooks()
+    local function H(Fn, Cb)
+        RegisterHook(GM_CLASS .. ":" .. Fn, Cb)
+        Log("level hook %s attached", Fn)
+    end
+    -- the requests to ITRLevelAddons go out inline from inside the hook (a console command, nothing queued): a send from a level event is heard
+    local function Send(What) if Maps then local Ok, E = pcall(Maps.OnLevelEvent, What); if not Ok then LogOnce("sendr" .. What, "level event %s: %s", What, tostring(E)) end end end
+    H("DoSavePlayerPosition", function() ResavePosition() end)
+    H("OnTransitionStart",    function() ResavePosition() end)
+    H("OnLevelPrepare",       function() Send("OnLevelPrepare"); ResavePosition(); ExecuteInGameThread(NoteLeft) end)
+    H("OnLevelStarted",       function() Send("OnLevelStarted"); OnLevelSettled("OnLevelStarted") end)
+    H("OnTransitionEnd",      function() Send("OnTransitionEnd"); OnLevelSettled("OnTransitionEnd") end)
+    H("OnEnteredMenu",        function()
+        Send("OnEnteredMenu")
+        NativeTrip = nil
+        if Current and Current.Native then Current = nil end
+        OnLevelSettled("OnEnteredMenu")
+    end)
+    NativeAttempt()
+end
+
+-- Registration and the level hooks. One record per native map: the config maps and the form maps the loader enters itself. The hooks are attached
+-- whenever there is a record or a form with trigger levels (a form that only hands back to another mod still needs the level events for its triggers).
+local function NativeStartup(FormMaps)
+    for _, M in ipairs(Config.Maps) do
+        if Opt(M, "Native", true) then NativeNew(M) end
+    end
+    for _, M in ipairs(FormMaps or {}) do NativeNew(M) end
+    for _, N in ipairs(NativeList) do
+        N.Tag, N.Sub = NativeTagOf(N.Map), NativeSubOf(N.Map)
+        Log("native: registering %s as %s (main sublevel %s) once the game is idle", N.Map.Name, N.Tag, N.Sub)
+    end
+    local NeedHooks = #NativeList > 0 or (Maps ~= nil and #Maps.Groups > 0)
+    if not NeedHooks then return end
+    -- Only the Blueprint game mode (BP_PRGameMode_C) counts: a notification for the native class or a default object can arrive before the
+    -- Blueprint class is bound, and hooking its functions then crashes the game (seen 1 s after start).
+    NotifyOnNewObject("/Script/IntoTheRadius.PRGameMode", function(Obj)
+        if LevelHooksAsked then return end
+        local Ok, Cls = pcall(function() return Obj:GetClass():GetFName():ToString() end)
+        local Okn, Nm = pcall(function() return Obj:GetFName():ToString() end)
+        if not (Ok and Cls == "BP_PRGameMode_C") or (Okn and Nm:sub(1, 9) == "Default__") then return end
+        LevelHooksAsked = true
+        Log("native: first game mode object %s: attaching the level hooks", Okn and Nm or "?")
+        ExecuteInGameThread(AttachLevelHooks)
+    end)
 end
 
 ---------------------------------------------------------------------------------------------------------------------
@@ -2351,28 +2495,30 @@ local function MapByName(Name)
     for _, M in ipairs(Config.Maps) do
         if M.Name == Name then return M end
     end
-    return nil
+    return Maps and Maps.ByName(Name) or nil
 end
 
 -- Enter Map: through the game's level transfer when the map is Native, else stream it in (Load). Native maps fall back to
 -- Load only with NativeFallback = true. Returns true when something was started.
-local function Enter(Map, Why)
+local function Enter(Map, Why, Anywhere)
     if Opt(Map, "Native", true) then
-        if NativeState.Map == Map and NativeState.Ready then
+        local N = NativeBy[Map]
+        if N and N.Ready then
             local World = UEHelpers.GetWorld()
-            if not (Valid(World) and IsHubVisible(World)) then
+            if not Anywhere and not (Valid(World) and IsHubVisible(World)) then
                 Log("native: %s: enter the map from the Hub", Why)
                 return false
             end
+            if Current then Log("native: %s: %s is already active", Why, Current.Map.Name); return false end
             return NativeEnter(Map, Why)
         end
         if not Opt(Map, "NativeFallback", false) then
             Log("native: %s: %s is not registered (%s); NativeFallback is off, nothing loaded", Why, Map.Name,
-                NativeState.Failed or "registration not finished")
+                N and N.Failed or "registration not finished")
             return false
         end
         Log("native: %s: %s is not registered (%s); falling back to the streaming loader", Why, Map.Name,
-            NativeState.Failed or "registration not finished")
+            N and N.Failed or "registration not finished")
     end
     Load(Map)
     return Current ~= nil
@@ -2394,7 +2540,7 @@ if KeyName ~= false then
             ExecuteInGameThread(function()
                 if Current then
                     StartExit("key")
-                else
+                elseif #Config.Maps > 0 then       -- (a Regions-only install has Maps = {})
                     local Map = Config.Maps[NextIndex]
                     NextIndex = NextIndex % #Config.Maps + 1
                     if Map then Enter(Map, "key") end
@@ -2457,35 +2603,34 @@ if Config.TriggerFile then
     end)
 end
 
--- Exit markers: checked twice a second while a map is loaded and settled
-LoopAsync(500, function()
-    ExecuteInGameThread(function()
-        if not Current or Current.Phase ~= "active" or not Current.Exits or #Current.Exits == 0 then return end
-        local Pawn = UEHelpers.GetPlayer()
-        if not Valid(Pawn) then return end
-        local L = Pawn:K2_GetActorLocation()
-        local R = Opt(Current.Map, "ExitRadius", 150)
-        Current.WatchTicks = (Current.WatchTicks or 0) + 1
-        if Current.WatchTicks % 60 == 1 and Current.WatchTicks < 400 then          -- every 30 s, a handful of lines
-            local Best, BestD = nil, 1e30
-            for _, E in ipairs(Current.Exits) do
-                local D = Dist2D(L, E)
-                if D < BestD then Best, BestD = E, D end
-            end
-            Log("exit watch: player at %s, nearest exit %s %.1f m away (radius %.1f m)", FmtV(L), Best and Best.Id or "-", BestD / 100, R / 100)
-        end
+-- Exit markers: one check of the exit watch (started by ArmExits). Returns true when the map is gone, which ends the watch.
+ExitWatchTick = function()
+    if not Current then return true end
+    if Current.Phase ~= "active" or not Current.Exits or #Current.Exits == 0 then return false end
+    local Pawn = UEHelpers.GetPlayer()
+    if not Valid(Pawn) then return false end
+    local L = Pawn:K2_GetActorLocation()
+    local R = Opt(Current.Map, "ExitRadius", 150)
+    Current.WatchTicks = (Current.WatchTicks or 0) + 1
+    if Current.WatchTicks % 60 == 1 and Current.WatchTicks < 400 then          -- every 30 s, a handful of lines
+        local Best, BestD = nil, 1e30
         for _, E in ipairs(Current.Exits) do
-            local DX, DY, DZ = L.X - E.X, L.Y - E.Y, L.Z - E.Z
-            if DX * DX + DY * DY < R * R and math.abs(DZ) < 250 then
-                Log("exit marker reached%s", E.Id and (" (id " .. E.Id .. ")") or "")
-                Remember(Current.Map, E.Id)
-                StartExit("exit marker")
-                return
-            end
+            local D = Dist2D(L, E)
+            if D < BestD then Best, BestD = E, D end
         end
-    end)
+        Log("exit watch: player at %s, nearest exit %s %.1f m away (radius %.1f m)", FmtV(L), Best and Best.Id or "-", BestD / 100, R / 100)
+    end
+    for _, E in ipairs(Current.Exits) do
+        local DX, DY, DZ = L.X - E.X, L.Y - E.Y, L.Z - E.Z
+        if DX * DX + DY * DY < R * R and math.abs(DZ) < 250 then
+            Log("exit marker reached%s", E.Id and (" (id " .. E.Id .. ")") or "")
+            Remember(Current.Map, E.Id)
+            StartExit("exit marker")
+            return false
+        end
+    end
     return false
-end)
+end
 
 if Config.AutoLoadInHub then
     local Map = MapByName(Config.AutoLoadInHub)
@@ -2499,7 +2644,7 @@ if Config.AutoLoadInHub then
             ExecuteInGameThread(function()
                 -- Native map: no timed entry. The transfer starts when the trigger item is picked up (NativeTriggerMesh),
                 -- or with the key. Only a failed registration with NativeFallback = true streams the map in as before.
-                if Opt(Map, "Native", true) and not (NativeState.Failed and Opt(Map, "NativeFallback", false)) then
+                if Opt(Map, "Native", true) and not ((NativeBy[Map] and NativeBy[Map].Failed) and Opt(Map, "NativeFallback", false)) then
                     return
                 end
                 if Current then
@@ -2522,10 +2667,69 @@ if Config.AutoLoadInHub then
     end
 end
 
-NativeStartup()
+-- Map forms (Content/Paks/ITRMaps): read by the copy installed as "ITRMapLoader" (a renamed copy reads none, as it starts no Regions page).
+local FormMaps = {}
+do
+    local Dir = tostring(ScriptDir() or ""):gsub("\\", "/"):lower()
+    local ReadForms = Config.Forms
+    if ReadForms == nil then ReadForms = Dir:find("/itrmaploader/", 1, true) ~= nil end
+    if ReadForms then
+        local OkM, M = pcall(require, "maps")
+        if OkM then
+            Maps = M
+            Maps.Init({
+                Exec = function(Cmd)
+                    local OkK, KSL = pcall(StaticFindObject, "/Script/Engine.Default__KismetSystemLibrary")
+                    if not OkK or not Valid(KSL) then return false end
+                    return (pcall(function() KSL:ExecuteConsoleCommand(UEHelpers.GetWorld(), Cmd, nil) end))
+                end,
+                EnterNative = function(Map, Why, Anywhere) return Enter(Map, Why, Anywhere) end,
+                Leave = function(Why) StartExit(Why) end,
+                CurrentMap = function() return Current and Current.Map or nil end,
+                GameData = function() return GetGameData() end,
+                PawnLoc = function() return PawnLoc() end,
+                PawnYaw = function()
+                    local Pawn = UEHelpers.GetPlayer()
+                    if not Valid(Pawn) then return nil end
+                    local Ok, R = pcall(function() return Pawn:K2_GetActorRotation().Yaw end)
+                    return Ok and R or nil
+                end,
+                StreamOf = function(Map)
+                    local World = UEHelpers.GetWorld()
+                    return Valid(World) and FindNativeEntry(World, NativeSubOf(Map)) or nil
+                end,
+                EntryByInstance = function(Instance)
+                    local World = UEHelpers.GetWorld()
+                    return Valid(World) and FindNativeEntry(World, Instance) or nil
+                end,
+            })
+            local OkR, Own = pcall(Maps.Read)
+            if OkR then FormMaps = Own else Log("forms: not read: %s", tostring(Own)) end
+        else
+            Log("forms: maps.lua not loaded: %s", tostring(M))
+        end
+    end
+end
+
+NativeStartup(FormMaps)
 
 Log("ready: %d map(s); key %s%s; native %s; Hub teardown %s; re-entry %s; gameplay activation %s; scripts dir %s", #Config.Maps, tostring(KeyName),
     Config.AutoLoadInHub and (", auto-load " .. Config.AutoLoadInHub .. " in the Hub") or "",
-    NativeState.Map and (NativeState.Map.Name .. " as " .. NativeState.Tag) or "off",
+    #NativeList > 0 and (#NativeList .. " native map(s), first " .. NativeList[1].Map.Name .. " as " .. tostring(NativeList[1].Tag)) or "off",
     Opt(nil, "HubTeardown", true) and "on" or "off", Opt(nil, "ReEntry", true) and "on" or "off",
     Opt(nil, "ActivateGameplay", true) and "on" or "off", ScriptDir())
+
+-- Regions page on the Hub's mission computer (regions.lua): hooks and a console command, registered last, after everything else has run, so
+-- that a failure there can only lose Regions, never the loader. Only the copy installed as "ITRMapLoader" starts it, so a renamed copy of
+-- this loader (a second map loader mod) does not make a second Regions page. Config Regions = true / false overrides.
+do
+    local Dir = tostring(ScriptDir() or ""):gsub("\\", "/"):lower()
+    local On = Config.Regions
+    if On == nil then On = Dir:find("/itrmaploader/", 1, true) ~= nil end
+    if not On then
+        Log("regions: off in this copy")
+    else
+        local OkR, ErrR = pcall(function() require("regions").Start({ Maps = Maps }) end)
+        if not OkR then Log("regions: not started: %s", tostring(ErrR)) end
+    end
+end

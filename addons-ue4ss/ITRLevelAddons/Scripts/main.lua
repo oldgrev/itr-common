@@ -1,15 +1,17 @@
 -- ITRLevelAddons: streams small add-on levels into a stock level of Into the Radius 1 (2.7.2) while that level is visible,
--- and hides named actors of the stock level. One JSON manifest per add-on in this mod's Addons folder; any number of
--- add-ons (from any number of mods) stack, each in its own streaming entry. See README.md.
+-- and hides named actors of the stock level. One JSON manifest per add-on in this mod's Addons folder (or "itraddons place" from another mod);
+-- any number of add-ons (from any number of mods) stack, each in its own streaming entry. See README.md.
 --
--- What it does, once a second on the game thread:
---   * target level visible (two checks in a row): stream the add-on level in, at the manifest's transform (default: the
---     origin, so an add-on is built in the stock level's world coordinates). The streaming entry is made once per world
---     with LevelStreaming::CreateInstance (LevelStreamingDynamic::LoadLevelInstance can't be called from UE4SS 3.0.1 Lua) and
---     reused on every later visit, so a Hub re-entry never makes a second copy;
---   * add-on visible: hide the listed actors of the stock level (hidden in game, collision off; never destroyed, so two
---     add-ons hiding the same actor is fine). Done again whenever the stock level was reloaded;
---   * target level gone (two checks in a row, e.g. the zone transfer): unload the add-on.
+-- Event driven: no timers, no loops and no script hooks. A small logic-only Blueprint (BP_ITRLevelWatch, in this mod's helper pak) binds a
+-- streaming entry's OnLevelShown / OnLevelHidden and runs the console command "itraddons shown|hidden <id>" when the level really appears or goes:
+--   * target level shown:  the add-on level is streamed in (at the manifest's transform; the default is the origin, so an add-on is built in the
+--                           stock level's world coordinates). A target that is already visible when the watch is set up is acted on at once.
+--                           The streaming entry is made once per world with LevelStreaming::CreateInstance and reused on every later visit.
+--   * add-on shown:        the listed actors of the stock level are hidden (hidden in game, collision off, never destroyed); the add-on's
+--                           "notify" command, if it has one, is run with the entry name.
+--   * target level hidden: the add-on level is unloaded.
+-- Setup (finding the entries and binding the watches) runs when a world's game mode appears, when the game registers streaming entries, and when
+-- another mod places an add-on. Without the helper pak the mod logs it and does nothing.
 -- This file avoids Lua 5.4-only syntax so `luac5.1 -p` can check it.
 
 local UEHelpers = require("UEHelpers")
@@ -18,8 +20,6 @@ local OkCfg, Config = pcall(require, "config")
 if not OkCfg or type(Config) ~= "table" then Config = {} end
 
 local TAG = "[" .. (Config.LogTag or "ITRLevelAddons") .. "] "
-local PollMs = Config.PollMs or 1000
-local Debounce = Config.Debounce or 2               -- checks in a row before loading / unloading
 local ModName = Config.ModName or "ITRLevelAddons"
 
 local function Log(fmt, ...) print(TAG .. string.format(fmt, ...) .. "\n") end
@@ -124,10 +124,38 @@ local function ListManifests()
 end
 
 local Addons = {}
+local Seen = {}
+-- Adds one checked add-on record (from a manifest file or from "itraddons place"). Returns true when it was added.
+local function AddAddon(A, Source)
+    if not A.Enabled then
+        Log("%s: %s is switched off (enabled = false)", Source, A.Name)
+        return false
+    end
+    if Seen[A.Name:lower()] then
+        Log("manifest REJECTED: %s: the add-on name %s is already used by %s", Source, A.Name, Seen[A.Name:lower()])
+        return false
+    end
+    -- the same level and target as an add-on already listed would stream a second copy on top of the first (a level is streamed once): refused
+    for _, O in ipairs(Addons) do
+        if O.Level:lower() == A.Level:lower() and O.Target:lower() == A.Target:lower() then
+            Log("manifest REJECTED: %s: add-on %s names the same level and target as %s (%s): a level is streamed once", Source, A.Name, O.Name, Seen[O.Name:lower()] or "?")
+            return false
+        end
+    end
+    Seen[A.Name:lower()] = Source
+    A.TargetL, A.LevelL = A.Target:lower(), A.Level:lower()
+    A.Wanted, A.Shown = false, false
+    A.Stream, A.HiddenFor = nil, {}
+    table.insert(Addons, A)
+    Log("add-on %s: %s into %s, %d actor(s) to hide%s", A.Name, A.Level, A.Target, #A.Hide,
+        (A.Location[1] ~= 0 or A.Location[2] ~= 0 or A.Location[3] ~= 0 or A.Rotation[2] ~= 0)
+        and string.format(", offset (%.0f, %.0f, %.0f) yaw %.1f", A.Location[1], A.Location[2], A.Location[3], A.Rotation[2]) or "")
+    return true
+end
+
 local function LoadManifests()
     local Files, How = ListManifests()
     Log("Addons folder %s: %d manifest(s) (listed with %s)", AddonsDir, #Files, How)
-    local Seen = {}
     for _, F in ipairs(Files) do
         local Text
         local Ok, H = pcall(io.open, F.Path, "rb")
@@ -139,27 +167,16 @@ local function LoadManifests()
             for _, W in ipairs(Warn or {}) do Log("manifest %s", W) end
             if not A then
                 Log("manifest REJECTED: %s", Err)
-            elseif not A.Enabled then
-                Log("manifest %s: %s is switched off (enabled = false)", F.Name, A.Name)
-            elseif Seen[A.Name:lower()] then
-                Log("manifest REJECTED: %s: the add-on name %s is already used by %s", F.Name, A.Name, Seen[A.Name:lower()])
             else
-                Seen[A.Name:lower()] = F.Name
-                A.TargetL = A.Target:lower()
-                A.State = "idle"               -- idle | loading | visible
-                A.Seen, A.Gone = 0, 0
-                A.Stream, A.HiddenFor = nil, {}
-                table.insert(Addons, A)
-                Log("add-on %s: %s into %s, %d actor(s) to hide%s", A.Name, A.Level, A.Target, #A.Hide,
-                    (A.Location[1] ~= 0 or A.Location[2] ~= 0 or A.Location[3] ~= 0 or A.Rotation[2] ~= 0)
-                    and string.format(", offset (%.0f, %.0f, %.0f) yaw %.1f", A.Location[1], A.Location[2], A.Location[3], A.Rotation[2]) or "")
+                AddAddon(A, F.Name)
             end
         end
     end
 end
 
+
 ---------------------------------------------------------------------------------------------------------------------
--- Streaming
+-- Streaming helpers
 ---------------------------------------------------------------------------------------------------------------------
 local function StreamingLevels(World)
     local Out = {}
@@ -182,17 +199,23 @@ local function IsVisible(S)
     return Ok and R == true
 end
 
--- The visible streaming entry of the target package (nil when it isn't visible)
-local function VisibleTarget(Levels, TargetL)
+-- Every streaming entry of one package (normally one; several are all watched)
+local function EntriesOf(Levels, PkgL)
+    local Out = {}
     for _, S in ipairs(Levels) do
-        if PkgName(S):lower() == TargetL and IsVisible(S) then return S end
+        if PkgName(S):lower() == PkgL then table.insert(Out, S) end
     end
-    return nil
+    return Out
+end
+
+local function AnyVisible(List)
+    for _, S in ipairs(List) do if IsVisible(S) then return true end end
+    return false
 end
 
 local function InstanceName(A) return "ITRAddon_" .. A.Name end
 
--- An entry this mod made earlier in this world (a Lua reload, or the map loader handing a Hub level back)
+-- An entry this mod made earlier in this world (a Lua reload, or the map loader handing a level back)
 local function FindOwnEntry(Levels, A)
     local Suffix = "/" .. InstanceName(A):lower()
     for _, S in ipairs(Levels) do
@@ -208,12 +231,9 @@ local function MakeEntry(World, Levels, A)
         local Ok, N = pcall(function() return S:GetClass():GetFName():ToString() end)
         if Ok and N == "LevelStreamingDynamic" then Source = S; break end
     end
-    if not Source then LogOnce("nosource", "no LevelStreamingDynamic in this world to copy; add-ons wait"); return nil end
+    if not Source then return nil, "no LevelStreamingDynamic in this world to copy" end
     local Ok, Stream = pcall(function() return Source:CreateInstance(InstanceName(A)) end)
-    if not Ok or not Valid(Stream) then
-        Log("add-on %s: CreateInstance failed (%s)", A.Name, tostring(Stream))
-        return nil
-    end
+    if not Ok or not Valid(Stream) then return nil, "CreateInstance failed (" .. tostring(Stream) .. ")" end
     Stream.PackageNameToLoad = FName(A.Level)
     local Q = Manifest.Quat(A.Rotation[1], A.Rotation[2], A.Rotation[3])
     Stream.LevelTransform = { Rotation = Q, Translation = { X = A.Location[1], Y = A.Location[2], Z = A.Location[3] },
@@ -278,75 +298,210 @@ local function ApplyHides(A, Levels)
 end
 
 ---------------------------------------------------------------------------------------------------------------------
--- The loop
+-- The level watch (BP_ITRLevelWatch, in this mod's helper pak): the only way a level appearing or going reaches Lua. No hook, no timer.
 ---------------------------------------------------------------------------------------------------------------------
-local WorldAddr = nil
+local WATCH_PATH = "/Game/Mods/ITRLevelAddons/BP_ITRLevelWatch.BP_ITRLevelWatch_C"
+local WatchClass = nil
+local function GetWatchClass()
+    if Valid(WatchClass) then return WatchClass end
+    local function Try(Fn) local Ok, O = pcall(Fn); if Ok and Valid(O) then return O end return nil end
+    WatchClass = Try(function() return StaticFindObject(WATCH_PATH) end)
+        or Try(function() return StaticFindObject("/Script/AssetRegistry.Default__AssetRegistryHelpers"):GetAsset({ ObjectPath = FName(WATCH_PATH) }) end)
+    return WatchClass
+end
 
-local function Tick()
+local WorldAddr = nil
+local Watched = {}        -- entry address -> true (this world)
+local PkgOfId = {}        -- watch id -> package (lower case)
+local IdOfPkg = {}        -- package (lower case) -> watch id
+local IdCount = 0
+local NoPak = false
+
+local function ResetWorld(Why)
+    Watched, PkgOfId, IdOfPkg, IdCount = {}, {}, {}, 0
+    for _, A in ipairs(Addons) do
+        A.Stream, A.Wanted, A.Shown, A.HiddenFor = nil, false, false, {}
+    end
+    if Why then Log("%s", Why) end
+end
+
+local function WatchEntry(Entry, PkgL)
+    local Key = tostring(Addr(Entry))
+    if Watched[Key] then return true end
+    local Class = GetWatchClass()
+    if not Class then
+        if not NoPak then NoPak = true; Log("helper pak not found (%s): add-ons off", WATCH_PATH) end
+        return false
+    end
+    local Id = IdOfPkg[PkgL]
+    if not Id then
+        IdCount = IdCount + 1
+        Id = "P" .. IdCount
+        IdOfPkg[PkgL], PkgOfId[Id] = Id, PkgL
+    end
+    local World = UEHelpers.GetWorld()
+    local Ok, W = pcall(function() return World:SpawnActor(Class, { X = 0, Y = 0, Z = 0 }, { Pitch = 0, Yaw = 0, Roll = 0 }) end)
+    if not Ok or not Valid(W) then Log("level watch for %s: SpawnActor failed (%s)", PkgL, tostring(W)); return false end
+    local OkW, E = pcall(function() W:Watch(Entry, Id) end)
+    if not OkW then Log("level watch for %s: Watch failed (%s)", PkgL, tostring(E)); return false end
+    Watched[Key] = true
+    return true
+end
+
+---------------------------------------------------------------------------------------------------------------------
+-- Setup: runs when a world starts (the game mode), when streaming entries appear, and when a request is taken. Idempotent.
+---------------------------------------------------------------------------------------------------------------------
+local function Exec(Cmd)
+    local World = UEHelpers.GetWorld()
+    local OkK, KSL = pcall(StaticFindObject, "/Script/Engine.Default__KismetSystemLibrary")
+    if not OkK or not Valid(KSL) then return false end
+    return (pcall(function() KSL:ExecuteConsoleCommand(World, Cmd, nil) end))
+end
+
+local function Setup(Why, Loud)
+    if #Addons == 0 then return end
     local World = UEHelpers.GetWorld()
     if not Valid(World) then return end
     local WA = Addr(World)
     if WA ~= WorldAddr then
-        if WorldAddr then Log("new world: the add-on streaming entries of the old one are gone") end
+        local Old = WorldAddr
         WorldAddr = WA
-        for _, A in ipairs(Addons) do
-            A.Stream, A.State, A.Seen, A.Gone, A.HiddenFor = nil, "idle", 0, 0, {}
-        end
+        ResetWorld(Old and "new world: the add-on streaming entries of the old one are gone" or nil)
     end
     local Levels = StreamingLevels(World)
     for _, A in ipairs(Addons) do
-        local T = VisibleTarget(Levels, A.TargetL)
-        if T then A.Seen, A.Gone = A.Seen + 1, 0 else A.Seen, A.Gone = 0, A.Gone + 1 end
-        if A.Stream and not Valid(A.Stream) then A.Stream, A.State = nil, "idle" end
-        if A.State == "idle" and A.Seen >= Debounce then
-            A.Stream = A.Stream or FindOwnEntry(Levels, A) or MakeEntry(World, Levels, A)
+        local Targets = EntriesOf(Levels, A.TargetL)
+        if #Targets == 0 then
+            if Loud then Log("add-on %s: %s has no streaming entry in this world: ignored for now (tried again at the next level event)", A.Name, A.Target) end
+        else
+            if A.Stream and not Valid(A.Stream) then A.Stream = nil end
+            if not A.Stream then
+                A.Stream = FindOwnEntry(Levels, A)
+                if not A.Stream then
+                    local S, Err = MakeEntry(World, Levels, A)
+                    if not S and Loud then Log("add-on %s: %s", A.Name, Err) end
+                    A.Stream = S
+                end
+            end
             if A.Stream then
-                SetWanted(A.Stream, true)
-                A.State, A.T0 = "loading", os.clock()
-                Log("add-on %s: %s is visible; streaming %s in", A.Name, A.Target, A.Level)
-            end
-        elseif A.State ~= "idle" and A.Gone >= Debounce then
-            SetWanted(A.Stream, false)
-            A.State, A.HiddenFor = "idle", {}
-            Log("add-on %s: %s is gone; %s unloaded", A.Name, A.Target, A.Level)
-        elseif A.State == "loading" then
-            if IsVisible(A.Stream) then
-                A.State = "visible"
-                Log("add-on %s: %s visible after %.1f s", A.Name, A.Level, os.clock() - (A.T0 or os.clock()))
-            elseif os.clock() - (A.T0 or 0) > 60 then
-                LogOnce("slow" .. A.Name, "add-on %s: %s not visible after 60 s (is the pak installed? the package path right?)", A.Name, A.Level)
-            end
-        end
-        if A.State == "visible" then
-            if not IsVisible(A.Stream) then
-                -- someone else unloaded it (the map loader's Hub teardown unloads every streaming level): don't fight over it,
-                -- wait about ten checks before asking again
-                A.State, A.Seen, A.HiddenFor = "idle", -8, {}
-                Log("add-on %s: %s was unloaded by something else; asking again in about %d s if %s stays visible", A.Name, A.Level,
-                    math.floor((8 + Debounce) * PollMs / 1000), A.Target)
-            else
-                ApplyHides(A, Levels)
+                local OkAll = true
+                for _, T in ipairs(Targets) do OkAll = WatchEntry(T, A.TargetL) and OkAll end
+                OkAll = WatchEntry(A.Stream, A.LevelL) and OkAll
+                for _, H in ipairs(A.Hide) do
+                    local HL = H.Level:lower()
+                    if HL ~= A.TargetL then
+                        for _, E in ipairs(EntriesOf(Levels, HL)) do WatchEntry(E, HL) end
+                    end
+                end
+                -- a target that is already visible gives no event: act now
+                if OkAll and not A.Wanted and AnyVisible(Targets) then
+                    A.Wanted = true
+                    SetWanted(A.Stream, true)
+                    Log("add-on %s: %s is visible; streaming %s in", A.Name, A.Target, A.Level)
+                end
             end
         end
     end
 end
 
+---------------------------------------------------------------------------------------------------------------------
+-- Level events (from the watch: console command 'itraddons shown|hidden <id>')
+---------------------------------------------------------------------------------------------------------------------
+local function OnShown(Id)
+    local PkgL = PkgOfId[Id]
+    if not PkgL then return end
+    local World = UEHelpers.GetWorld()
+    local Levels = StreamingLevels(World)
+    for _, A in ipairs(Addons) do
+        if A.TargetL == PkgL and not A.Wanted and A.Stream then
+            A.Wanted = true
+            SetWanted(A.Stream, true)
+            Log("add-on %s: %s is visible; streaming %s in", A.Name, A.Target, A.Level)
+        end
+        if A.LevelL == PkgL and A.Wanted then
+            A.Shown = true
+            Log("add-on %s: %s visible", A.Name, A.Level)
+            ApplyHides(A, Levels)
+            if A.Notify then Exec(A.Notify .. " " .. InstanceName(A)) end
+        end
+        if A.Shown then
+            for _, H in ipairs(A.Hide) do
+                if H.Level:lower() == PkgL then ApplyHides(A, Levels) break end
+            end
+        end
+    end
+end
+
+local function OnHidden(Id)
+    local PkgL = PkgOfId[Id]
+    if not PkgL then return end
+    for _, A in ipairs(Addons) do
+        if A.TargetL == PkgL and A.Wanted then
+            A.Wanted, A.Shown, A.HiddenFor = false, false, {}
+            if A.Stream then SetWanted(A.Stream, false) end
+            Log("add-on %s: %s is gone; %s unloaded", A.Name, A.Target, A.Level)
+        elseif A.LevelL == PkgL and A.Shown then
+            A.Shown, A.HiddenFor = false, {}
+            Log("add-on %s: %s was unloaded by something else while %s stays", A.Name, A.Level, A.Target)
+        end
+    end
+end
+
+---------------------------------------------------------------------------------------------------------------------
+-- Entry points: console commands, the game mode, new streaming entries
+---------------------------------------------------------------------------------------------------------------------
+-- Other mods ask for an add-on by console command ("itraddons place name=... level=... target=... [notify=verb:sub]"; values have no spaces).
+-- The handler adds a record, sets it up, and answers by console command "itrmapbind placed <name>" (that is how this mod registers itself with the
+-- map loader). A repeated name is refused quietly. Nothing is queued here: the caller may be inside a game-thread action (UE4SS c62ada0).
+pcall(function() ModRef:SetSharedVariable("ITRLevelAddons.Place", 1) end)
+if type(RegisterConsoleCommandHandler) == "function" then
+    local OkC = pcall(RegisterConsoleCommandHandler, "itraddons", function(_, Params)
+        local Verb = Params and Params[1] and tostring(Params[1]):lower() or ""
+        if Verb == "shown" or Verb == "hidden" then
+            local Id = Params[2] and tostring(Params[2]) or ""
+            local Ok, E = pcall(Verb == "shown" and OnShown or OnHidden, Id)
+            if not Ok then LogOnce("lverr" .. tostring(E), "level event %s %s: error %s", Verb, Id, tostring(E)) end
+            return true
+        end
+        if Verb ~= "place" then Log("itraddons: unknown verb '%s' (use place)", Verb); return true end
+        local Kv = {}
+        for I = 2, (Params and #Params or 0) do
+            local K, V = tostring(Params[I]):match("^([%w_]+)=(.*)$")
+            if K then Kv[K] = V end
+        end
+        local A, Err = Manifest.FromPlace(Kv)
+        if not A then Log("itraddons place REJECTED: %s", Err); return true end
+        if AddAddon(A, "itraddons place") then
+            Setup("place", true)
+            Exec("itrmapbind placed " .. A.Name)
+        end
+        return true
+    end)
+    Log("console command 'itraddons place': %s", OkC and "registered" or "NOT registered")
+end
+
 LoadManifests()
 
-local Running, Crashes = false, 0
-LoopAsync(PollMs, function()
+-- A world starts: its game mode is created. Setup is queued (never run inside the notify callback itself).
+local Pending = false
+local function QueueSetup(Why)
+    if Pending or #Addons == 0 then return end
+    Pending = true
     ExecuteInGameThread(function()
-        if Running then                  -- the last tick never finished: a native error UE4SS logged and pcall did not catch
-            Crashes = Crashes + 1
-            Log("tick %d aborted by a native error (see the Error line above)", Crashes)
-        end
-        if Crashes >= 20 then return end
-        Running = true
-        local Ok, E = pcall(Tick)
-        Running = false
-        if not Ok then LogOnce("err" .. tostring(E), "error: %s", tostring(E)) end
+        Pending = false
+        local Ok, E = pcall(Setup, Why, false)
+        if not Ok then LogOnce("seterr" .. tostring(E), "setup error: %s", tostring(E)) end
     end)
-    return Crashes >= 20
-end)
+end
+if #Addons > 0 and type(NotifyOnNewObject) == "function" then
+    pcall(NotifyOnNewObject, "/Script/IntoTheRadius.PRGameMode", function(Obj)
+        local Ok, Cls = pcall(function() return Obj:GetClass():GetFName():ToString() end)
+        local Okn, Nm = pcall(function() return Obj:GetFName():ToString() end)
+        if not (Ok and Cls == "BP_PRGameMode_C") or (Okn and Nm:sub(1, 9) == "Default__") then return end
+        QueueSetup("game mode")
+    end)
+    -- streaming entries (the game registers one per sublevel when a world starts) are the other moment a target can appear
+    pcall(NotifyOnNewObject, "/Script/Engine.LevelStreamingDynamic", function() QueueSetup("streaming entry") end)
+end
 
-Log("ready: %d add-on(s); checking every %d ms", #Addons, PollMs)
+Log("ready: %d add-on(s); no timers, no hooks; level watch %s", #Addons, WATCH_PATH)

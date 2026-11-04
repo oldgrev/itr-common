@@ -92,7 +92,7 @@ Key = "F10",
 | `ExitTag` | `ExitTag` below | A map can use its own exit tag. |
 | `NativeExitLocation` | none | A Hub gate's location tag to arrive at in the Hub; none = the Hub's `PlayerStart`. Can be set globally. |
 | `LootManifest` | `Scripts/<Name>.loot.json` | Path of the loot manifest (see "Loot"). |
-| `LootHolderClass` | `BP_<Name>_LootTables_C` | Class name of the actor in the map that keeps the map's loot tables alive. |
+| `LootHolderClass` | `BP_<Name>_LootTables_C` | Streaming mode only: class name of the actor in the map that keeps the map's loot tables alive. A native map no longer needs it (the tables are loaded at startup and kept alive for the session); a placed holder actor is harmless. |
 
 Global settings (outside `Maps`):
 | Field | Default | Meaning |
@@ -196,9 +196,11 @@ tag does not share used points with the donor).
 The game's config is loaded at engine start and the garbage collector doesn't look inside it, so a table that only the
 config refers to would be collected and later crash the loot roll. So:
 - the tags are registered at startup on the donor's (stock) tables;
-- your own tables are kept alive by one Blueprint actor in the map, whose instance-editable array `Tables` lists them
-  (class `BP_<Name>_LootTables_C`, or `LootHolderClass`);
-- while the map's level is loaded the entries point at your tables, and before it goes they point back at the donor tables.
+- a native map's own tables are loaded at startup and kept alive for the whole session, so the entries point at them from the first roll (a
+  holder actor is no longer needed);
+- streaming mode: your own tables are kept alive by one Blueprint actor in the map, whose instance-editable array `Tables` lists them
+  (class `BP_<Name>_LootTables_C`, or `LootHolderClass`); while the map's level is loaded the entries point at your tables, and before it
+  goes they point back at the donor tables.
 
 A map without loot nodes needs no manifest, and the example map has none. `Scripts/Example.loot.example.json` is a sample
 manifest with both forms (a donor-only tag, and a tag with its own table). The loader ignores it; copy it to
@@ -253,3 +255,92 @@ teardown, multiple exits, the re-entry memory, gameplay activation and the loot 
   back to `TransferToLevel`) while you still stand on the map, waits for the Hub, restores the Hub levels the game did
   not bring back, and unloads the map once you are off it.
 - `RequireLevelManagerReady = false` is for desktop `-nohmd` test runs only.
+
+## Regions (Hub mission computer)
+`Scripts/regions.lua` adds a REGIONS row to the Hub mission computer's main page, between MISSIONS and PLAY TAPE. Pressing it opens the
+stock Play tape page with one row per map instead of one per tape (name in capitals, a second line for the description), the stock
+Back button and the stock scroll bar. Pressing a map's row enters it. Play tape lists tapes again as soon as you press it.
+
+With ITRMapLoader installed and a config with `Maps = {}` and `Key = false` (a Regions-only install), the loader starts no timers at
+all. The maps that Regions lists come from two places:
+
+1. **Map forms**: one small JSON text file per map in `IntoTheRadius/Content/Paks/ITRMaps/`, installed next to the map's pak. No
+   shared class, nothing cooked, no editor. If ITRMapLoader is not installed the file does nothing.
+2. **This mod's own `config.lua` `Maps`**: the first native map and any streaming map, the ones its key, Hub item and `itrmap`
+   console command can start (not listed when `ConsoleCommand = false`). A form with the same name wins.
+
+Pressing a map runs `<command> enter <name>` as a console command, the same convention as `itrmap enter <name>`. So the mod that
+enters your map needs a console command that answers `enter`; until the loader enters maps itself, a renamed copy of this loader
+with its own `ConsoleCommand` does (set `Regions = false` in its config, or just keep its folder name different from `ITRMapLoader`:
+only the copy in a folder called `ITRMapLoader` starts a Regions page).
+
+### Add your map: the form
+```json
+{
+  "schema": 1,
+  "name": "ItrShowcase",
+  "displayName": "ITR Showcase",
+  "description": "2.5 km demo map",
+  "level": "/Game/Mods/ItrShowcase/L_ItrShowcase",
+  "levelTag": "Level.Zone.ItrShowcase",
+  "start": { "x": -143800, "y": -385500, "z": 3184, "yaw": 0 },
+  "enter": { "command": "itrshowcase" },
+  "triggers": [ { "kind": "item", "mesh": "Liquid08_1" } ]
+}
+```
+| Field | Rule |
+|---|---|
+| `schema` | Required, `1`. A higher number is refused with "needs a newer ITRMapLoader". |
+| `name` | Optional, default the file name without `.json`. Letters, digits, `_` and `-` only (it goes into a console command). |
+| `displayName` | Optional, default `name`. Shown in capitals. |
+| `description` | Optional. The second line of the row. |
+| `level` | Required, the level package, for example `/Game/Mods/MyMap/L_MyMap`. A form whose level is not installed is not listed (the log says so). |
+| `levelTag` | Optional, default `Level.Zone.<name>`. Logged only. |
+| `start` | Optional. Checked, not used yet. |
+| `enter.command` | Required. The console command of the mod that enters the map. |
+| `triggers` | Optional. A map with none is fine and is reachable from Regions only (one log line). Not used yet. |
+| `enabled` | Optional. `false` skips the file, with a log line. |
+
+Unknown fields are logged and ignored. One bad file stops nothing: it is refused with one log line that names the file and the field,
+and the other maps are still listed. The log lines start with `regions:` (found, refused, no triggers, how many were listed).
+
+`itrregions list` logs the listed maps. `itrregions press row`, `press back`, `press entry <name>` and `press rowevent <name>` do what a
+press does without the laser, for tests.
+
+Limits: a finger touch on the REGIONS row lights it and does nothing (the laser works); the thumbstick does not scroll the list, as on the
+tape page (drag the scroll bar with the laser).
+
+## Doors
+A form can ask for a door in the Hub: a wooden door in its frame, with the map's name on a sign above it. Grab the handle (as on a stock
+door) and the normal transition runs. The map maker writes one line:
+```json
+"triggers": [
+  { "kind": "door", "at": { "x": -33500, "y": -2700, "z": 10, "yaw": 90 } },
+  { "kind": "item", "mesh": "SM_Tea01D" }
+]
+```
+| Kind | Map maker | Player | Needs |
+|---|---|---|---|
+| `door` | One line. `at` is the floor point under the door and which way it faces (yaw in degrees). Left out, the door takes the next free entry of `DoorSpots` in this mod's `config.lua` (sorted by map name; none left = no door, one log line) | A door with a sign. Grab the handle: you go | `ITRLevelAddons` and `ITRMapLoader_P.pak` (the door level) installed, next to this mod |
+| `item` | One line naming the static mesh of a Hub prop | Pick up that prop in the Hub and you go. One Lua call per grab of any physics prop, in every level, and only if some form asks | This mod only |
+
+A bad or unknown trigger loses only that trigger (one log line); the map stays in Regions. Two doors within 150 cm, or two forms using
+one mesh: the first by sorted map name keeps it, the other is logged. No triggers is fine (one log line). Without `ITRLevelAddons` or the
+pak, the map stays in Regions and the log says so (`regions: <n> door(s) asked for, but ... is not installed`). There are no walk-in
+triggers: a player can walk through one by accident and lose their place in the Hub.
+
+How it works: all doors are the same small level (`/Game/Mods/ITRMapLoader/L_ITRMapLoader`, one `BP_ITRMapDoor` in it, held once in
+`ITRMapLoader_P.pak`). This mod sends `ITRLevelAddons` one `itraddons place` per door, each at that door's spot; when the door's level is
+visible, the door asks this mod (`itrmapdoor`) which map it belongs to and is given the console command to run (`<command> enter <name>`,
+the same one Regions sends) and the sign text. The door has no Tick, and no timer until it is grabbed. Sources: `build-from-source/`
+(`Specs/BP_ITRMapDoor.json`, `Scripts/build_door.py`); it needs a project with the BPGen plugin, VRExpansion and the wooden door
+meshes (the Showcase project).
+
+A way out of a map as a door: copy the door spec into your map, use `<command> leave` as the default `EnterCommand`, and put no
+`itr:exit` TargetPoints in the map. A map without exit markers never starts the exit watch, so it runs no timer at all.
+
+## Timers
+Doors add one: `ITRLevelAddons` checks once a second whether the Hub is visible (it is separate from this mod). A config with a native map starts no timers while you are in the Hub: registration, arrival and leaving are driven by the game's level
+events (`OnEnteredMenu`, `OnLevelStarted`, `OnTransitionEnd` and the others), hooked once. The exit markers are the exception: standing
+near a plain `TargetPoint` raises no event, so a check runs twice a second, only while a map that has exit markers is loaded. The
+streaming mode, `TriggerFile` and `AutoLoadInHub` keep their own short timers, as before.
