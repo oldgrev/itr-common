@@ -1,9 +1,23 @@
-# T-215 design: BoltDebounce (time debounce on bolt, slide and pump eject/feed)
+# BoltDebounce design notes (T-215)
 
-Read-only research result. Nothing in the repo or the game was changed. Evidence paths are at the end (section 10);
-`dis` = `build/work/T-214/scratch/bp/<BP>.dis.txt` (file line, then bytecode offset), `asm` = `build/work/T-214/scratch/asm/OnTick_141133570.asm`.
+This is a proposed fix for a fiddly problem: a small wobble of a weapon's bolt, slide or pump can make
+the game eject extra live rounds. The idea is to ignore those repeated movements briefly, while still
+letting you rack and clear the weapon normally. That short filter is what “debounce” means here.
 
-## 0. Summary
+These are research and design notes, not an installation guide or a report of a finished, tested mod.
+The research described here didn't change the repo or the game. The implementation details, estimates,
+and open questions are kept below so someone can pick up the work without repeating the investigation.
+
+Start with section 0 for the proposed behaviour. Sections 1–4 explain the code and trade-offs;
+sections 5–8 cover expected results, packaging and testing. Section 9 lists unresolved decisions,
+and section 10 lists the evidence.
+
+For the disassembly references below, `dis` means `build/work/T-214/scratch/bp/<BP>.dis.txt`
+(file line, then bytecode offset), and `asm` means `build/work/T-214/scratch/asm/OnTick_141133570.asm`.
+“Stock” means the game's existing behaviour. “Eject” is a round leaving the chamber; “feed” is the
+next round entering it. `N` is the debounce time, in milliseconds.
+
+## 0. How the proposed fix works
 
 - One Blueprint manager actor per world (`BP_BoltDebounce_Manager`, spawned once by the Lua loader) binds once to the player's two
   `GripMotionControllerComponent.OnGrippedObject` / `OnDroppedObject`. When a player hand grips a weapon (the gun, its slide, its bolt), the manager
@@ -18,13 +32,13 @@ Read-only research result. Nothing in the repo or the game was changed. Evidence
   2. **Hold:** once Opened, the weapon stays Opened until the slide has been forward of the stock line *continuously* for N ms,
      or has passed `ReleaseFraction` (default 0.5) of its travel. Each return into the stock band restarts the N ms.
   3. **Lockout:** after a feed (leaving Opened), re-entering Opened is blocked for N ms, or until the action has closed (a full stroke).
-- Result: exactly one eject and one feed per real stroke; full strokes, fast clearing and short-strokes behave like stock (feed may come at
-  mid-stroke instead of at the band edge). The jitter glitch (one live round per wobble) is gone.
+- Intended result: exactly one eject and one feed per real stroke; full strokes, fast clearing and short-strokes behave like stock (feed may come at
+  mid-stroke instead of at the band edge). This should prevent the jitter glitch that loses one live round per wobble; the VR checks below still need to confirm it.
 - Limits: Mosin/DVL get rules 1 and 2 only. Rule 3 needs a lever on the native Opened entry, which has none (section 1.2). Rule 2 with the
   retrigger makes the residual a deliberate partial stroke. PPSh / PPSh_full (open-bolt) are excluded: no live-round loss there (T-214).
 - Default N = 100 ms (9 frames at 90 Hz), tunable live; measurement mode logs every eject/feed with intervals.
 
-## 1. Hook points (where a Blueprint can suppress a repeated transition)
+## 1. Where the mod can stop a repeated eject or feed
 
 ### 1.1 Mag-fed: BP_MagFirearmItem ReceiveTick (33 children; 31 closed-bolt)
 - Stock logic, only while `BoltHandled && !boltAnimated` (dis 429-431, off 11307-11374):
@@ -44,7 +58,7 @@ Read-only research result. Nothing in the repo or the game was changed. Evidence
 - No event exists for the eject or the feed (both inline in the tick; the only side effects are an item spawn and the native
   `UInventoryItem::SetBoltState`), so the component must look at `BoltState` once per tick while the slide is handled (cost in 2.4).
 - Children: all 33 have the same function list from the parents; `BP_M14` adds a ReceiveTick override and `BP_SPAS` a LoadCycle override
-  (`build/work/T-215/scratch/ownfns.py` on `bp2/*.json`). The worker checks that BP_M14's ReceiveTick calls the parent (gate G3).
+  (`build/work/T-215/scratch/ownfns.py` on `bp2/*.json`). Before implementing this, check that BP_M14's ReceiveTick calls the parent (gate G3).
 
 ### 1.2 Mosin / DVL: native UWeaponBoltComponent + BPA_Firearm_BoltAction handler
 - Native `OnTick` (asm 297-349): slide position integrates hand delta, clamped to cached `front` (+0x5c4) / `rear` (+0x5c8);
@@ -63,7 +77,7 @@ Read-only research result. Nothing in the repo or the game was changed. Evidence
   handler runs right after the stock handler, inside the same native tick, before the next one. It cannot pre-empt the stock handler.
 - **Cannot cover: the lockout (rule 3).** Re-entry to Opened is `|Y-rear| <= 0.01` against the cached rear; no public property moves the rear
   or blocks the entry (`SlideCoeff` would freeze the bolt for the hand, which changes handling). The only routes are overriding `ExtractRound`
-  in a child class (section 1.5) or the aiMod ProcessEvent hook (not shareable because people shouldn't have to download an additional dll that does proxy dll etc etc). With rule 2's retrigger the residual needs a forward move past
+  in a child class (section 1.5) or the aiMod ProcessEvent hook (not suitable for the shared mod: it would require people to install another DLL and its proxy setup). With rule 2's retrigger the residual needs a forward move past
   1 cm held for N ms, or past mid-stroke, then a pull back within N: a deliberate partial stroke.
 - Corner: a 4 -> 2 jump during a hold (only on a frame hitch: mid-stroke to the front in one frame) skips the stock feed. The component then
   does it: `SetLoadingLock(true)` (IAmmoContainer message on the internal mag), `LoadRound()` if the chamber is empty, `bJammed = Is Going to Jam`.
@@ -85,11 +99,11 @@ Read-only research result. Nothing in the repo or the game was changed. Evidence
   They reference the game classes by path; the build project has never-packed stand-ins of `BPA_BaseItem`, `BP_FirearmItem`,
   `BP_MagFirearmItem`, `BPA_Firearm_BoltAction`, `BP_Firearm_PumpAction` with only the touched variables/functions, each declared on the class
   that declares it in the game (`declaredIn` in the T-214 bp JSON), the same pattern as bullet-penetration's stand-in parent.
-- Lua (load time only): find/load the manager class, `World:SpawnActor` it once per world (npc-lab precedent `npc-lab/lua/NpcLab/Scripts/main.lua:119-137`)  ```I don't like npc-lab being a reference as it's not performant and testing only! - grev```,
+- Lua (load time only): find/load the manager class, `World:SpawnActor` it once per world (npc-lab precedent `npc-lab/lua/NpcLab/Scripts/main.lua:119-137`)  **Grev’s note:** npc-lab is for testing and has performance problems; treat it as a reference to investigate, not a pattern to copy unchanged.,
   write the tunables into the manager and its class defaults, register the console command `bdb`. A 2 s loop only checks that the cached manager
   is still valid in the current world (no FindAllOf). In measurement mode only, a 500 ms loop copies new log lines.
 - The manager gets the hands as `VRBaseCharacter.LeftMotionController / RightMotionController` of the player pawn (npc-lab precedent
-  `npc-lab/Tools/gen_specs.py:504-506, 2089-2100`), binds `OnGrippedObject(GripInformation)` / `OnDroppedObject(GripInformation, bWasSocketed)`  ```I don't like npc-lab being a reference as it's not performant and testing only! - grev```
+  `npc-lab/Tools/gen_specs.py:504-506, 2089-2100`), binds `OnGrippedObject(GripInformation)` / `OnDroppedObject(GripInformation, bWasSocketed)`  **Grev’s note:** npc-lab is for testing and has performance problems; treat it as a reference to investigate, not a pattern to copy unchanged.
   (SDK `VRExpansionPlugin_classes.hpp:341-342`), and on start registers whatever the hands already hold (`GetGrippedActors`/`GetGrippedComponents`, :398-399).
   A 2 s Blueprint timer rebinds if the pawn changed.
 
@@ -100,9 +114,9 @@ Read-only research result. Nothing in the repo or the game was changed. Evidence
 | Child class per weapon, swapped in `DT_ItemInfos` (`/Game/ITR/Configurations/Infos/DT_ItemInfos`, row `FPRItemInfo.ActorClass`) | everything, incl. Mosin lockout by overriding `ExtractRound` (BPA dis 282-291 shows it is overridable) | 36 children + stand-ins per weapon; placed level weapons keep the stock class; only the Mosin lockout needs it. Save-safe: saves hold `UInventoryItem.ItemId` (a tag) and the class comes from the DataTable row by `ItemTypeID` (SDK `IntoTheRadius_classes.hpp:4344-4363`, `IntoTheRadius_structs.hpp:1740-1746`; inferred from the layout, not from a save file). Kept as an optional phase 2 for Mosin/DVL only. |
 | Dispatcher binding alone | observation | runs after the stock handler (ScriptDelegates.h:479-501), cannot suppress |
 | Lua hooks per tick/event | all | slow path, and UE4SS native errors are not caught by pcall (gotchas, T-133/T-146) |
-| aiMod DLL ProcessEvent | all | not shareable because people shouldn't have to download an additional dll that does proxy dll etc etc |
+| aiMod DLL ProcessEvent | all | not suitable for the shared mod: it would require people to install another DLL and its proxy setup |
 
-## 2. Debounce logic per system (Blueprint terms)
+## 2. How each weapon system would handle the filter
 
 Common: `N = Mgr.DebounceMs / 1000` (0 = component does nothing but optional logging), `RF = Mgr.ReleaseFraction`, `now = GetRealTimeSeconds`.
 Component `BPC_BoltDebounce` (ActorComponent, tick off by default, `SetTickGroup(TG_PostPhysics)` + `AddTickPrerequisiteActor(owner)` so it
@@ -165,14 +179,14 @@ tick:
   PrevOut = BoltFullOut
 on unregister: if Holding { BoltMoved = false }; if SelfWroteOut and !BoltFullInn { BoltFullOut = false }; clear flags
 ```
-### 2.4 Cost
+### 2.4 Expected performance (not measured yet)
 - Per event (E, F, R, corner): 10-25 Blueprint nodes, a few microseconds; at most a few per second while racking. Logging (string build) only in measurement mode.
 - Per tick, mag-fed and IZ81, per weapon in a player hand: steady state about 8 nodes (read `BoltState`/flags, compare, return); during a hold about
   18 nodes. Estimate 2-8 microseconds per frame per held weapon, under 0.1 % of an 11.1 ms frame; nothing runs for weapons not in a hand.
   Mosin/DVL: no tick except during a hold (at most a few hundred ms per stroke). These are estimates; measure with the VR frame-time tool in the test pass.
 - Unavoidable: mag-fed (no event for eject/feed, 1.1). IZ81 the same (BoltOUT/re-arm are inline).
 
-## 3. Which N is safe
+## 3. Choosing a debounce time
 | Quantity | Value | Source |
 |---|---|---|
 | VR tick | 90 Hz = 11.1 ms; transitions are sampled once per tick, so an out-and-back glitch takes at least 2 ticks (22 ms) | - |
@@ -188,7 +202,7 @@ on unregister: if Holding { BoltMoved = false }; if SelfWroteOut and !BoltFullIn
   eject-to-eject) / 2. That is exactly the user's "halve the shortest real interval" rule, so the rule stays safe even with the refinements off.
 - Default 100 ms (9 ticks) is inside both bounds.
 
-## 4. Risks
+## 4. Edge cases and things to check
 - **Jams.** Mag-fed: the eject unjams (dis 382-384, off 10372-10386) and is never held; jams are rolled at firing (dis 339-345, off 9425-9556) with
   the slide closed, so no lockout is active; the component also ends hold/lock whenever `Jammed_bolt`. Mosin: the jam roll is at the feed
   (dis 225-226) and is cleared at Opened (dis 235-237); the hold only delays the roll; the corner path rolls it too (needs the stand-in
@@ -228,7 +242,7 @@ on unregister: if Holding { BoltMoved = false }; if SelfWroteOut and !BoltFullIn
 | Rear to closed in one frame during a hold | n/a | corner feed once: chamber 1, M-1 |
 | Mosin/DVL: feed, then back to the rear within N (deliberate partial stroke) | eject | eject (no lockout for Mosin/DVL) |
 
-## 6. Delivery (bullet-penetration pattern)
+## 6. Proposed files, settings and console commands
 - `BoltDebounce_P.pak` -> `Content/Paks/~mods/`; Lua folder `BoltDebounce/` (`enabled.txt`, `Scripts/main.lua`, `Scripts/config.lua`) -> `Content/Paks/LuaMods/`.
 - `config.lua`: `DebounceMs = 100` (0 = stock), `ReleaseFraction = 0.5` (1.0 = time only), `Log = false` (measurement mode), `LogFile = true`,
   `Systems = { MagFed = true, BoltAction = true, Pump = true }`.
@@ -240,11 +254,11 @@ on unregister: if Holding { BoltMoved = false }; if SelfWroteOut and !BoltFullIn
   `F*` (corner feed), `xE` / `xF` (a stock transition the debounce held back). `full` = the action closed since the previous eject.
   Lua (500 ms loop, measurement mode only) prints new lines to UE4SS.log and appends them to `LuaMods/BoltDebounce/measure.csv`.
   `bdb stats`: per class, shortest full-stroke eject-to-eject, shortest held-back interval, count of held-back transitions, suggested N = half the shortest full-stroke interval.
-- Optional aiMod panel (not shareable because people shouldn't have to download an additional dll that does proxy dll etc etc, the mod does not need it): like the bullet-penetration tab (`aiMod/Menu.cpp:269-345`): buttons send
+- Optional aiMod panel (not suitable for the shared mod: it would require people to install another DLL and its proxy setup, the mod does not need it): like the bullet-penetration tab (`aiMod/Menu.cpp:269-345`): buttons send
   `bdb ...` console commands, the panel reads `state.txt` and the tail of `measure.csv` once a second, shows N, the last 8 intervals, the shortest
   full-stroke interval and the suggestion.
 
-## 7. Measurement and tuning (in-game wording)
+## 7. How to measure and tune it once implemented
 1. Start the game. In UE4SS.log check the line "[BoltDebounce] active".
 2. Open the UE4SS console (or the aiMod tab) and type `bdb off`, then `bdb log on`. The filter is now off and every eject and feed is logged.
 3. Take a Glock, an AK (or SKS), the Mosin and the IZ81, each fully loaded. With each one: work the slide / bolt / pump as fast as you can,
@@ -255,7 +269,7 @@ on unregister: if Holding { BoltMoved = false }; if SelfWroteOut and !BoltFullIn
 7. Check: load each weapon again and clear it as fast as you can. Every stroke throws exactly one round; `bdb stats` shows no held-back
    transitions for full strokes. Then pull back, wiggle at the rear and hold: one round only.
 
-## 8. VR test list (one check per item)
+## 8. Checks to run in VR
 1. Glock: rack slowly once: one round comes out, the next is chambered (fire it).
 2. Glock: clear a full magazine as fast as you can: rounds on the floor = magazine + 1, gun empty.
 3. Glock: pull the slide fully back and wiggle it at the rear for two seconds: one round comes out.
@@ -280,9 +294,9 @@ on unregister: if Holding { BoltMoved = false }; if SelfWroteOut and !BoltFullIn
 22. Grabbing a gun causes no hitch or stutter.
 23. Remove the mod, load the save from item 19: it loads, the Mosin is there.
 
-## 9. Open questions
+## 9. Decisions still to make
 1. BPGen: binding a dispatcher of another object (`K2Node_AddDelegate` on the hands and on `WeaponBolt`) is untested (SPEC.md:59 says
-   create_delegate is untested). Gate G1 in the brief; fallback is a small `bind` op in the npc-lab BPGen copy. Main to confirm that change is allowed. ```I don't like npc-lab being a reference as it's not performant and testing only! - grev```
+   create_delegate is untested). Gate G1 in the brief; fallback is a small `bind` op in the npc-lab BPGen copy. The proposed change to that copy still needs approval from the project owner. **Grev’s note:** npc-lab is for testing and has performance problems; treat it as a reference to investigate, not a pattern to copy unchanged.
 2. BPGen function stand-ins have inputs only (`ItrShowcaseBPGen.cpp:983-1047`); `Is Going to Jam` needs its output, `BoltState` needs an enum
    variable type. Extend BPGen, or accept that the rare Mosin corner feed skips the jam roll.
 3. ReleaseFraction (end the hold at mid-stroke) is a refinement over a pure time debounce; it keeps fast strokes stock-like. Keep it (default 0.5)?
@@ -292,7 +306,7 @@ on unregister: if Holding { BoltMoved = false }; if SelfWroteOut and !BoltFullIn
    flag goes false, so a missed drop only delays the restore.
 7. The aiMod panel: wanted now or later?
 
-## 10. Evidence index
+## 10. Where the evidence came from
 - T-214 findings: `build/work/T-214/findings.txt`; disassembly `build/work/T-214/scratch/bp/{BP_MagFirearmItem,BPA_Firearm_BoltAction,BP_Firearm_PumpAction,BP_FirearmItem,BP_SPAS,BP_Mosin}.dis.txt`;
   native tick `build/work/T-214/scratch/asm/OnTick_141133570.asm` lines 297-349; bands `build/work/T-214/scratch/magtable.txt`.
 - Variable owners and types: `build/work/T-215/scratch/varown.py` and `fnsig.py` on `build/work/T-214/scratch/bp/*.json` (`declaredIn`, `specType`).
@@ -300,7 +314,7 @@ on unregister: if Holding { BoltMoved = false }; if SelfWroteOut and !BoltFullIn
 - Base ExtractRound does nothing for an empty chamber: `BP_FirearmItem.dis.txt:828` (off 23185).
 - SDK: `SDK/SDK/IntoTheRadius_classes.hpp:11424-11445` (UWeaponBoltComponent), `:4344-4410` (UInventoryItem), `IntoTheRadius_structs.hpp:1717-1722, 1740-1746`
   (FAmmoContainerData, FPRItemInfo), `VRExpansionPlugin_classes.hpp:302, 341-342, 398-399`.
-- npc-lab stand-ins: `npc-lab/Source/IntoTheRadius/Public/WeaponBoltComponent.h`, `IAmmoContainer.h`; BPGen `npc-lab/Plugins/ItrShowcaseEditor/SPEC.md`  ```I don't like npc-lab being a reference as it's not performant and testing only! - grev```,
+- npc-lab stand-ins: `npc-lab/Source/IntoTheRadius/Public/WeaponBoltComponent.h`, `IAmmoContainer.h`; BPGen `npc-lab/Plugins/ItrShowcaseEditor/SPEC.md`  **Grev’s note:** npc-lab is for testing and has performance problems; treat it as a reference to investigate, not a pattern to copy unchanged.,
   `.../Private/ItrShowcaseBPGen.cpp:480-611, 983-1047`.
 - Delegate order: `C:/ue427/Engine/Source/Runtime/Core/Public/UObject/ScriptDelegates.h:479-501, 559`.
 - Bullet-penetration pattern: `public/itr-common/bullet-penetration/README.md`, `BulletPenetration/Scripts/main.lua`, `build-from-source/`; `docs/agents/where.md:76`.

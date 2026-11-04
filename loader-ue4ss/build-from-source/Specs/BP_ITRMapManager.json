@@ -1,0 +1,124 @@
+{
+ "once": false,
+ "_doc": "ITRMapLoader manager: at the first level change after it started it runs the console command 'itrmaps register' once (Lua grows the game's level table then); Requests carries the add-on requests ('name|level|target;...') for ITRLevelAddons. No Tick, no timer.",
+ "asset": "/Game/Mods/ITRMapLoader/BP_ITRMapManager",
+ "parent": "/Script/Engine.Actor",
+ "components": [],
+ "variables": [
+  {
+   "name": "Registered",
+   "type": "bool",
+   "default": "false"
+  },
+  {
+   "name": "Requests",
+   "type": "string",
+   "default": ""
+  }
+ ],
+ "cdo": {
+  "PrimaryActorTick": "(bCanEverTick=False)"
+ },
+ "nodes": [
+  {
+   "id": "n1",
+   "op": "custom_event",
+   "name": "Start"
+  },
+  {
+   "id": "n2",
+   "op": "call",
+   "function": "EventsManager:GetEventsManager"
+  },
+  {
+   "id": "n3",
+   "op": "create_delegate",
+   "function": "HTEnd"
+  },
+  {
+   "id": "n4",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/IntoTheRadius.EventsManager',MemberName=\"OnTransitionEnd\")"
+   }
+  },
+  {
+   "id": "n5",
+   "op": "custom_event",
+   "name": "HTEnd"
+  },
+  {
+   "id": "n6",
+   "op": "branch"
+  },
+  {
+   "id": "n7",
+   "op": "call",
+   "function": "KismetMathLibrary:Not_PreBool"
+  },
+  {
+   "id": "n8",
+   "op": "get",
+   "var": "Registered"
+  },
+  {
+   "id": "n9",
+   "op": "set",
+   "var": "Registered",
+   "pins": {
+    "Registered": true
+   }
+  },
+  {
+   "id": "n10",
+   "op": "call",
+   "function": "KismetSystemLibrary:ExecuteConsoleCommand",
+   "pins": {
+    "Command": "itrmaps register"
+   }
+  },
+  {
+   "id": "n11",
+   "op": "self"
+  }
+ ],
+ "links": [
+  [
+   "n2.ReturnValue",
+   "n4.self"
+  ],
+  [
+   "n3.OutputDelegate",
+   "n4.delegate"
+  ],
+  [
+   "n1.then",
+   "n4.execute"
+  ],
+  [
+   "n8.Registered",
+   "n7.A"
+  ],
+  [
+   "n7.ReturnValue",
+   "n6.Condition"
+  ],
+  [
+   "n5.then",
+   "n6.execute"
+  ],
+  [
+   "n6.True",
+   "n9.execute"
+  ],
+  [
+   "n11.self",
+   "n10.WorldContextObject"
+  ],
+  [
+   "n9.then",
+   "n10.execute"
+  ]
+ ]
+}

@@ -1,94 +1,95 @@
 -- ITRMapLoader settings. Edit this file; main.lua reads it, and main.lua holds nothing that belongs to one particular map.
--- This copy is set up for the example map (example-map/): grab the sugar cube in the Hub and you arrive on the example map;
--- step on its return pad and you are back in the Hub.
+-- As provided there is no config map: map forms (Content/Paks/ITRMaps, see README.md) are read and the Regions page lists the ones that ask for it.
+-- The example map (example-map/) is kept below as a commented block: remove the "-- " in front of it to use it, which also gives you its sugar cube
+-- trigger (grab the sugar cube in the Hub and you arrive on the example map) and the key F10 (set Key = "F10"). Install the example pak and its tag pak too.
 --
--- To load your own map, change the Maps entry below (see "Maps" for what each field does). One loader mod loads one
--- native map. To load several maps, copy the ITRMapLoader folder under another name (for example MyMapLoader), give
--- each copy its own map, trigger (NativeTriggerMesh / Key) and ConsoleCommand, and enable both in mods.txt.
+-- To load your own map by this route, add a Maps entry like the example (see "Maps" for what each field does). One copy of this loader loads any number
+-- of maps: several Maps entries and several forms. Do not install a second copy under another folder name: only the first copy to start can hook the game
+-- mode's level events, so a second copy never registers its maps.
 --
 -- Every key below except Maps is optional; the value shown is the default.
--- Regions: the Regions page on the Hub's mission computer (regions.lua) is started by the copy installed in a folder called ITRMapLoader.
--- A renamed copy does not start a second page; Regions = true / false overrides. A Regions-only install uses Maps = {} and Key = false.
+-- Regions: the Regions page on the Hub's mission computer (regions.lua) is started by the copy installed in a folder called ITRMapLoader; Regions = true / false overrides.
 -- Regions = nil,
 -- Forms = nil,   -- read the map forms in Content/Paks/ITRMaps: the copy installed as ITRMapLoader does; true / false overrides.
 return {
-    Maps = {
-        {
-            -- ---- Which map ----
-            -- Name: short name of the map. Also picks the loot manifest file (Scripts/<Name>.loot.json) and names the map in the log.
-            Name = "Example",
-            -- Regions: true = this map is listed on the Hub computer's REGIONS page (the page is only touched when some map asks). Default: not listed.
-            Regions = true,
-            -- Level: the level package as cooked, under /Game/Mods/. The last part is the world's name and must match the
-            -- .umap file name; it becomes the level's "main sublevel" the game looks up by name.
-            Level = "/Game/Mods/Example/L_Example",
-            -- StartTag: actor tag of the TargetPoint the player arrives at (the start marker in your map).
-            StartTag = "itr:player_start",
+    Maps = {},
+    -- Example map (uncomment the whole block, and remove the line Maps = {} above):
+    -- Maps = {
+    --     {
+    --         -- ---- Which map ----
+    --         -- Name: short name of the map. Also picks the loot manifest file (Scripts/<Name>.loot.json) and names the map in the log.
+    --         Name = "Example",
+    --         -- Regions: true = this map is listed on the Hub computer's REGIONS page (the page is only touched when some map asks). Default: not listed.
+    --         Regions = true,
+    --         -- Level: the level package as cooked, under /Game/Mods/. The last part is the world's name and must match the
+    --         -- .umap file name; it becomes the level's "main sublevel" the game looks up by name.
+    --         Level = "/Game/Mods/Example/L_Example",
+    --         -- StartTag: actor tag of the TargetPoint the player arrives at (the start marker in your map).
+    --         StartTag = "itr:player_start",
 
-            -- ---- How it is registered ----
-            -- Native = true (default): the map is registered with the game as a level at startup (a streaming entry, a row in
-            -- the game's level table and a map centre) and entered through the game's level transfer, like a zone gate does.
-            -- You get the transition screen, Hub unloading, level events, loot and arrival the game normally gives a zone.
-            -- Native = false: the older streaming mode, which streams the map in next to the Hub (see "Streaming mode" below).
-            Native = true,
-            -- NativeTag: the level's gameplay tag. Default "Level.Zone." .. Name.
-            -- NativeTag = "Level.Zone.Example",
-            -- DisplayName: the level name the game shows. Default Name.
-            DisplayName = "Example",
-            -- NativeDonorTag: a stock zone whose time, inventory, generator and map-scale settings are copied into the new level.
-            NativeDonorTag = "Level.Zone.Buffer",
-            -- NativeSaves: false = no autosave, save-on-load, save-on-exit or sleeping while you are in the map, so no save file
-            -- ever names the level (safe if you remove the mod later; progress is kept by the Hub autosave after you return).
-            -- true = the level saves like a zone; if the mod is removed, a save made there would point at a level that no
-            -- longer exists, so only use it for a map you are sure stays installed. It also needs the level tag registered
-            -- (a zzz_ITRMap_<Name>_Tags_P.pak, see "Saving" in the loader README), or the save loads into the Hub.
-            NativeSaves = false,
-            -- NativeReloadOnTide: true only once the map has its own tide actor (reloads the level when a tide happens).
-            NativeReloadOnTide = false,
-            -- NativeRadius: the level row's MaxLevelRadius (cm).
-            NativeRadius = 50000,
-            -- NativeCenter: where the map sits in the world (cm), for the handheld map and map points. Use the centre of
-            -- your playable area in world coordinates (the example is built at (0, -600000, 0)).
-            NativeCenter = { X = 0, Y = -600000, Z = 0 },
-            -- NativeStart: where the game puts you on arrival (world cm, Yaw in degrees). Use the start marker's position;
-            -- without it the game searches for a PlayerStart and may pick another level's.
-            NativeStart = { X = -3000, Y = -600000, Z = 20, Yaw = 0 },
-            -- NativeArriveTolerance: if you arrive farther than this (cm) from the start (or arrive) marker, you are moved there.
-            -- NativeArriveTolerance = 3000,
-            -- NativeFallback: true = if the native registration fails, enter with the streaming mode instead.
-            -- NativeFallback = false,
+    --         -- ---- How it is registered ----
+    --         -- Native = true (default): the map is registered with the game as a level at startup (a streaming entry, a row in
+    --         -- the game's level table and a map centre) and entered through the game's level transfer, like a zone gate does.
+    --         -- You get the transition screen, Hub unloading, level events, loot and arrival the game normally gives a zone.
+    --         -- Native = false: the older streaming mode, which streams the map in next to the Hub (see "Streaming mode" below).
+    --         Native = true,
+    --         -- NativeTag: the level's gameplay tag. Default "Level.Zone." .. Name.
+    --         -- NativeTag = "Level.Zone.Example",
+    --         -- DisplayName: the level name the game shows. Default Name.
+    --         DisplayName = "Example",
+    --         -- NativeDonorTag: a stock zone whose time, inventory, generator and map-scale settings are copied into the new level.
+    --         NativeDonorTag = "Level.Zone.Buffer",
+    --         -- NativeSaves: false = no autosave, save-on-load, save-on-exit or sleeping while you are in the map, so no save file
+    --         -- ever names the level (safe if you remove the mod later; progress is kept by the Hub autosave after you return).
+    --         -- true = the level saves like a zone; if the mod is removed, a save made there would point at a level that no
+    --         -- longer exists, so only use it for a map you are sure stays installed. It also needs the level tag registered
+    --         -- (a zzz_ITRMap_<Name>_Tags_P.pak, see "Saving" in the loader README), or the save loads into the Hub.
+    --         NativeSaves = false,
+    --         -- NativeReloadOnTide: true only once the map has its own tide actor (reloads the level when a tide happens).
+    --         NativeReloadOnTide = false,
+    --         -- NativeRadius: the level row's MaxLevelRadius (cm).
+    --         NativeRadius = 50000,
+    --         -- NativeCenter: where the map sits in the world (cm), for the handheld map and map points. Use the centre of
+    --         -- your playable area in world coordinates (the example is built at (0, -600000, 0)).
+    --         NativeCenter = { X = 0, Y = -600000, Z = 0 },
+    --         -- NativeStart: where the game puts you on arrival (world cm, Yaw in degrees). Use the start marker's position;
+    --         -- without it the game searches for a PlayerStart and may pick another level's.
+    --         NativeStart = { X = -3000, Y = -600000, Z = 20, Yaw = 0 },
+    --         -- NativeArriveTolerance: if you arrive farther than this (cm) from the start (or arrive) marker, you are moved there.
+    --         -- NativeArriveTolerance = 3000,
+    --         -- NativeFallback: true = if the native registration fails, enter with the streaming mode instead.
+    --         -- NativeFallback = false,
 
-            -- ---- How you get in ----
-            -- NativeTriggerMesh: grabbing a Hub item whose static mesh has this name enters the map. "SM_Tea01D" is the sugar
-            -- cube on the Hub's table. Give each loader mod a different item. nil = no item trigger (use Key or ConsoleCommand).
-            NativeTriggerMesh = "SM_Tea01D",
-            -- NativeTriggerFunction: the grab event hooked for the item trigger. This one is the Hub props' Blueprint.
-            -- NativeTriggerFunction = "/Game/ITR/BPs/Items/BP_PhysicsActor.BP_PhysicsActor_C:OnGrip",
+    --         -- ---- How you get in ----
+    --         -- NativeTriggerMesh: grabbing a Hub item whose static mesh has this name enters the map. "SM_Tea01D" is the sugar
+    --         -- cube on the Hub's table. Give each loader mod a different item. nil = no item trigger (use Key or ConsoleCommand).
+    --         NativeTriggerMesh = "SM_Tea01D",
+    --         -- NativeTriggerFunction: the grab event hooked for the item trigger. This one is the Hub props' Blueprint.
+    --         -- NativeTriggerFunction = "/Game/ITR/BPs/Items/BP_PhysicsActor.BP_PhysicsActor_C:OnGrip",
 
-            -- ---- How you get out ----
-            -- Standing within ExitRadius of a TargetPoint tagged ExitTag in the map takes you back to the Hub. The example has one,
-            -- on the small pad with a post. Any number of exits works (see ExitTag below; a map can also set its own here).
-            -- ExitTag = "itr:exit",
-            -- NativeExitLocation: a Hub gate's location tag to arrive at in the Hub, or nil for the Hub's PlayerStart.
-            -- NativeExitLocation = nil,
+    --         -- ---- How you get out ----
+    --         -- Standing within ExitRadius of a TargetPoint tagged ExitTag in the map takes you back to the Hub. The example has one,
+    --         -- on the small pad with a post. Any number of exits works (see ExitTag below; a map can also set its own here).
+    --         -- ExitTag = "itr:exit",
+    --         -- NativeExitLocation: a Hub gate's location tag to arrive at in the Hub, or nil for the Hub's PlayerStart.
+    --         -- NativeExitLocation = nil,
 
-            -- ---- Loot (maps with loot nodes) ----
-            -- The map's loot tags come from Scripts/<Name>.loot.json (or Map.LootManifest = path). Each tag borrows the budget
-            -- and tables of a stock "donor" tag. The tables in the manifest are kept alive by one Blueprint actor in the map,
-            -- found by its class name:
-            -- LootHolderClass = "BP_Example_LootTables_C",   -- default "BP_" .. Name .. "_LootTables_C"
-            -- The example map has no loot, so it needs no manifest.
+    --         -- ---- Loot (maps with loot nodes) ----
+    --         -- The map's loot tags come from Scripts/<Name>.loot.json (or Map.LootManifest = path). Each tag borrows the budget
+    --         -- and tables of a stock "donor" tag. The tables in the manifest are kept alive by one Blueprint actor in the map,
+    --         -- found by its class name:
+    --         -- LootHolderClass = "BP_Example_LootTables_C",   -- default "BP_" .. Name .. "_LootTables_C"
+    --         -- The example map has no loot, so it needs no manifest.
 
-            -- ---- Streaming mode only (Native = false) ----
-            -- HideLightingScenario: true only for maps with baked lighting: hides the Hub's lighting-scenario level while loaded.
-            HideLightingScenario = false,
-            -- HubTeardown, ReEntry, ExitRadius and ActivateGameplay below can also be set per map, which overrides the global value.
-        },
-    },
+    --         -- ---- Streaming mode only (Native = false) ----
+    --         -- HideLightingScenario: true only for maps with baked lighting: hides the Hub's lighting-scenario level while loaded.
+    --         HideLightingScenario = false,
+    --         -- HubTeardown, ReEntry, ExitRadius and ActivateGameplay below can also be set per map, which overrides the global value.
+    --     },
+    -- },
 
-    -- Keyboard key that enters the map, or leaves it again. A UE4SS key name; false = no key. Default F10.
-    -- Give each loader mod a different key.
-    Key = "F10",
+    -- Keyboard key that enters the map, or leaves it again. A UE4SS key name; false = no key (as provided: with the example block, use Key = "F10").
+    Key = false,
 
     -- Console command typed in the game console (or sent by another mod):
     --   itrmap enter [MapName]    enter the map          itrmap leave    leave the map

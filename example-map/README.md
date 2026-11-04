@@ -1,21 +1,24 @@
 # Example map
 
-A small test map for Into the Radius 1 (2.7.2). It's an 80 m floor with a checker pattern, some walls and cover, a
+This is a small map for trying out custom maps in Into the Radius 1 (2.7.2). It's an 80 m floor with a checker pattern, some walls and cover, a
 hut, and a ramp up to a platform. It has a sky dome and Movable lights, a start marker, navmesh, and an exit pad about
 8 m to the left of where you start, which takes you back to the Hub.
 
-It is also the map the [loader](../loader-ue4ss/) is configured for out of the box. In the Hub, pick up the **sugar cube**
+The [loader](../loader-ue4ss/)'s `config.lua` has this map's entry as a commented block: remove the `-- ` in front of it (and delete the line `Maps = {},` above it) to try it. With that done, in the Hub, pick up the **sugar cube**
 (the item with the static mesh `SM_Tea01D`) and you go through the game's transition onto this map; step on the exit pad
 and you come back to the Hub the same way.
 
-The floor uses `M_ExampleGrid`, a material your editor compiles, so it doubles as a check that your special editor
-works. Built with the special editor, the checker shows up in game. Built with stock 4.27, the game would crash or
-draw it black. If you only have stock 4.27, set `OWN_MATERIAL = False` in `Scripts/build_example.py` and it'll stick
-to engine content.
+The checker floor also gives you a quick way to check your editor setup. Its material, `M_ExampleGrid`, is compiled
+by your editor. With the patched editor, it shows up properly in game. Stock 4.27 would compile it in a form that
+crashes the game or draws black.
 
-The long explanation is in [`../map-making/guide.md`](../map-making/guide.md).
+If you only have stock 4.27, set `OWN_MATERIAL = False` in `Scripts/build_example.py` to use engine content instead.
+We haven't tested that stock-editor route yet.
+
+For the editor setup and the full walkthrough, see [`../map-making/guide.md`](../map-making/guide.md).
 
 ## Just want to try it?
+
 [`prebuilt/zzz_ITRMap_Example_P.pak`](prebuilt/) is this map already built with the special editor (343 KB,
 SHA-256 `a4b5eccd579f981e4d02ed7051d48e32c37d7ae1e017d3a7d9c37786e5b17dfc`). Next to it is
 [`prebuilt/zzz_ITRMap_Example_Tags_P.pak`](prebuilt/) (692 bytes, SHA-256
@@ -24,19 +27,22 @@ uninstall. The steps for installing UE4SS, the loader and the paks are at the to
 [the main README](../README.md#example-map-test).
 
 ## Building it yourself
-1. Copy this folder somewhere. It's a blueprint-only project, and `Content/` gets created in step 3.
+
+1. Copy this folder to wherever you want to work. It's a blueprint-only project; the missing `Content/` folder is
+   expected, and step 3 creates it.
 2. Get the game's `DefaultEngine.ini` into the project:
    ```powershell
    .\extract-game-config.ps1 -Engine "C:\ue427\Engine"
    ```
 3. Make the map. Either open `IntoTheRadius.uproject` and run `Scripts\build_example.py` from File, Execute Python
-   Script, or run it headless:
+   Script, or use the command below to run it without opening the editor window:
    ```bat
    C:\ue427\Engine\Binaries\Win64\UE4Editor-Cmd.exe <path>\IntoTheRadius.uproject -run=pythonscript -script=<path>\Scripts\build_example.py -nullrhi
    ```
    That creates the material `/Game/Mods/Example/M_ExampleGrid`, an editor-only host level
    `/Game/Mods/Example/L_ExampleHost`, and the map itself, `/Game/Mods/Example/L_Example`.
-4. Build the navmesh. This needs the full editor, a commandlet won't do it. Either run `Scripts\build_navmesh.py`
+4. Build the navmesh, which tells enemies where they can walk. This step needs the full editor; the command-line
+   editor used above cannot build it. Either run `Scripts\build_navmesh.py`
    from File, Execute Python Script, or start the editor unattended:
    ```bat
    C:\ue427\Engine\Binaries\Win64\UE4Editor.exe <path>\IntoTheRadius.uproject "-ExecCmds=py <path>\Scripts\build_navmesh.py" -ITRQuit
@@ -47,7 +53,7 @@ uninstall. The steps for installing UE4SS, the loader and the paks are at the to
    ```powershell
    .\build-map.ps1 -Engine "C:\ue427\Engine" -Install
    ```
-   That also builds and installs `zzz_ITRMap_Example_Tags_P.pak` (with [`build-tags.ps1`](build-tags.ps1)), which registers
+   `-Install` copies the paks into `<game>\IntoTheRadius\Content\Paks\~mods\` (created if missing). That also builds and installs `zzz_ITRMap_Example_Tags_P.pak` (with [`build-tags.ps1`](build-tags.ps1)), which registers
    the level tag `Level.Zone.Example`. The example leaves `NativeSaves` off, so nothing depends on it here, but a map that
    saves inside itself does (see "Saving" in the [loader README](../loader-ue4ss/README.md)).
 6. Load it with the [loader](../loader-ue4ss/): grab the sugar cube in the Hub (or press F10, the loader's default key).
@@ -56,6 +62,7 @@ To turn it into your own map, change `FOLDER`, `HOST` and `MAP` at the top of bo
 editor by hand), and pass `-Map <Name>` to `build-map.ps1` (plus `-Tag <your NativeTag>` if it isn't `Level.Zone.<Name>`).
 
 ## What we tested (October 2026)
+
 - Steps 2 to 5 with the special editor. The material compiled to 30 shaders, the navmesh got saved into the map, and
   the pak came out at 343 KB.
 - In VR, loaded from the Hub with the UE4SS script: the checker floor looks right, you land on the start marker, three
@@ -63,8 +70,9 @@ editor by hand), and pass `-Map <Name>` to `build-map.ps1` (plus `-Tag <your Nat
 - We haven't tried building it with stock 4.27.2 (`OWN_MATERIAL = False`).
 
 ## What a map needs for native entry
-The example is entered natively (the loader registers it as a game level, then uses the game's level transfer). The map
-itself needs very little for that, and everything the example has is already there:
+
+“Native entry” means the loader registers the map as a game level and lets the game handle the transition.
+The example already has the pieces this needs. If you're making your own map, here's what to keep:
 - **A start marker:** a `TargetPoint` tagged `itr:player_start` (the example puts it 30 m from the middle of the map,
   8 m from the exit pad). The loader moves you there if the game puts you more than 30 m away.
 - **An exit:** a `TargetPoint` tagged `itr:exit`, with a visible pad and post on it. Standing within 1.5 m of it takes you
@@ -76,7 +84,7 @@ itself needs very little for that, and everything the example has is already the
   config's `NativeCenter` and `NativeStart` use those world coordinates.
 - Nothing else: no gates, no level blueprint, no game mode, no save data. Loot and spawners are optional (see the loader README).
 
-What the modder adds is the loader's `config.lua` entry. For this map:
+The other piece is an entry in the loader's `config.lua`. This is the example's entry:
 
 ```lua
 {
@@ -93,5 +101,5 @@ What the modder adds is the loader's `config.lua` entry. For this map:
     NativeTriggerMesh = "SM_Tea01D",                      -- grab this Hub item to enter
 }
 ```
-To make your own map, change the folder, `Name`, `Level`, the centre and the start to your map's, and pick a Hub item that
+To make your own map, change the folder, `Name`, `Level`, the centre and the start to your map's, and choose a Hub item that
 no other loader uses (the loader README lists each field and a few Hub items).

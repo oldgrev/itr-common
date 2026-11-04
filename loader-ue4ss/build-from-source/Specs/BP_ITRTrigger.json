@@ -1,0 +1,3111 @@
+{
+ "once": false,
+ "_doc": "ITRMapLoader's trigger Blueprint: logic only, no mesh, no collision, no component the player can meet, no Tick, no timer. One per trigger of a form. It finds the author's object in the stream it names and binds it (collision: overlap events of every part, only the player body fires, once per entry; grab: the object's own OnGripped, no delay). Fire: a way in calls Entry.Enter(); an exit stores the return point, then enters another map (Dest), or transfers to a stock level (ToTag, AtGate or a saved position), or to the Hub. It changes nothing on the author's object.",
+ "asset": "/Game/Mods/ITRMapLoader/BP_ITRTrigger",
+ "parent": "/Script/Engine.Actor",
+ "components": [],
+ "variables": [
+  {
+   "name": "Target",
+   "type": "object:/Script/Engine.Actor",
+   "tooltip": "the author's object this trigger listens to"
+  },
+  {
+   "name": "Armed",
+   "type": "bool",
+   "default": "true",
+   "tooltip": "collision: fires on entering, not again until the player has left"
+  },
+  {
+   "name": "Busy",
+   "type": "bool",
+   "default": "false",
+   "tooltip": "grab: a grab is being handled"
+  },
+  {
+   "name": "Result",
+   "type": "int",
+   "default": "0",
+   "tooltip": "0 nothing bound, 1 bound and usable, 2 bound but nothing can be touched"
+  },
+  {
+   "name": "Primitives",
+   "type": "int",
+   "default": "0"
+  },
+  {
+   "name": "Touchable",
+   "type": "int",
+   "default": "0"
+  },
+  {
+   "name": "Found",
+   "type": "object:/Script/Engine.Actor",
+   "tooltip": "FindByName: the actor with that path name, or None"
+  },
+  {
+   "name": "Kind",
+   "type": "int",
+   "default": "0",
+   "tooltip": "0 exit, 1 way in"
+  },
+  {
+   "name": "Grab",
+   "type": "bool",
+   "default": "false",
+   "tooltip": "false collision, true grab"
+  },
+  {
+   "name": "ObjectName",
+   "type": "string",
+   "default": ""
+  },
+  {
+   "name": "StreamName",
+   "type": "string",
+   "default": "",
+   "tooltip": "the streaming entry the object lives in"
+  },
+  {
+   "name": "Where",
+   "type": "string",
+   "default": "",
+   "tooltip": "log text prefix"
+  },
+  {
+   "name": "Entry",
+   "type": "object:/Game/Mods/ITRMapLoader/BP_ITRMapEntry.BP_ITRMapEntry_C"
+  },
+  {
+   "name": "Dest",
+   "type": "object:/Game/Mods/ITRMapLoader/BP_ITRMapEntry.BP_ITRMapEntry_C"
+  },
+  {
+   "name": "ToMissing",
+   "type": "bool",
+   "default": "false"
+  },
+  {
+   "name": "Note",
+   "type": "string",
+   "default": ""
+  },
+  {
+   "name": "HasTo",
+   "type": "bool",
+   "default": "false"
+  },
+  {
+   "name": "ToTag",
+   "type": "struct:GameplayTag"
+  },
+  {
+   "name": "AtGate",
+   "type": "struct:GameplayTag"
+  },
+  {
+   "name": "HasAtPos",
+   "type": "bool",
+   "default": "false"
+  },
+  {
+   "name": "PendingAt",
+   "type": "bool",
+   "default": "false"
+  },
+  {
+   "name": "AtLoc",
+   "type": "vector",
+   "default": "0,0,0"
+  },
+  {
+   "name": "AtYaw",
+   "type": "float",
+   "default": "0"
+  },
+  {
+   "name": "HubTag",
+   "type": "struct:GameplayTag",
+   "default": "(TagName=\"Level.Hub\")"
+  },
+  {
+   "name": "Stream",
+   "type": "object:/Script/Engine.LevelStreaming"
+  },
+  {
+   "name": "Retrying",
+   "type": "bool",
+   "default": "false"
+  }
+ ],
+ "cdo": {
+  "PrimaryActorTick": "(bCanEverTick=False)"
+ },
+ "nodes": [
+  {
+   "id": "n1",
+   "op": "custom_event",
+   "name": "Fire"
+  },
+  {
+   "id": "n2",
+   "op": "get",
+   "var": "Where"
+  },
+  {
+   "id": "n3",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "itrmaps log "
+   }
+  },
+  {
+   "id": "n4",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "B": " fired"
+   }
+  },
+  {
+   "id": "n5",
+   "op": "call",
+   "function": "KismetSystemLibrary:ExecuteConsoleCommand"
+  },
+  {
+   "id": "n6",
+   "op": "self"
+  },
+  {
+   "id": "n7",
+   "op": "branch"
+  },
+  {
+   "id": "n8",
+   "op": "call",
+   "function": "KismetMathLibrary:EqualEqual_IntInt",
+   "pins": {
+    "B": 1
+   }
+  },
+  {
+   "id": "n9",
+   "op": "get",
+   "var": "Kind"
+  },
+  {
+   "id": "n10",
+   "op": "call",
+   "function": "/Game/Mods/ITRMapLoader/BP_ITRMapEntry.BP_ITRMapEntry_C:Enter"
+  },
+  {
+   "id": "n11",
+   "op": "get",
+   "var": "Entry"
+  },
+  {
+   "id": "n12",
+   "op": "branch"
+  },
+  {
+   "id": "n13",
+   "op": "get",
+   "var": "ToMissing"
+  },
+  {
+   "id": "n14",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "itrmaps log "
+   }
+  },
+  {
+   "id": "n15",
+   "op": "get",
+   "var": "Note"
+  },
+  {
+   "id": "n16",
+   "op": "call",
+   "function": "KismetSystemLibrary:ExecuteConsoleCommand"
+  },
+  {
+   "id": "n17",
+   "op": "self"
+  },
+  {
+   "id": "n18",
+   "op": "call",
+   "function": "/Game/Mods/ITRMapLoader/BP_ITRMapEntry.BP_ITRMapEntry_C:StoreReturn"
+  },
+  {
+   "id": "n19",
+   "op": "get",
+   "var": "Entry"
+  },
+  {
+   "id": "n20",
+   "op": "get",
+   "var": "Dest"
+  },
+  {
+   "id": "n21",
+   "op": "call",
+   "function": "KismetSystemLibrary:IsValid"
+  },
+  {
+   "id": "n22",
+   "op": "branch"
+  },
+  {
+   "id": "n23",
+   "op": "call",
+   "function": "/Game/Mods/ITRMapLoader/BP_ITRMapEntry.BP_ITRMapEntry_C:Enter"
+  },
+  {
+   "id": "n24",
+   "op": "get",
+   "var": "Dest"
+  },
+  {
+   "id": "n25",
+   "op": "branch"
+  },
+  {
+   "id": "n26",
+   "op": "get",
+   "var": "HasTo"
+  },
+  {
+   "id": "n27",
+   "op": "branch"
+  },
+  {
+   "id": "n28",
+   "op": "get",
+   "var": "HasAtPos"
+  },
+  {
+   "id": "n29",
+   "op": "set",
+   "var": "PendingAt",
+   "pins": {
+    "PendingAt": true
+   }
+  },
+  {
+   "id": "n30",
+   "op": "call",
+   "function": "SaveAt"
+  },
+  {
+   "id": "n31",
+   "op": "self"
+  },
+  {
+   "id": "n32",
+   "op": "get",
+   "var": "ToTag"
+  },
+  {
+   "id": "n33",
+   "op": "get",
+   "var": "AtGate"
+  },
+  {
+   "id": "n34",
+   "op": "call",
+   "function": "GameplayStatics:GetGameMode"
+  },
+  {
+   "id": "n35",
+   "op": "self"
+  },
+  {
+   "id": "n36",
+   "op": "cast",
+   "class": "IPRGameMode"
+  },
+  {
+   "id": "n37",
+   "op": "call",
+   "function": "IPRGameMode:TransferToLevel"
+  },
+  {
+   "id": "n38",
+   "op": "cast",
+   "class": "IPRGameMode"
+  },
+  {
+   "id": "n39",
+   "op": "call",
+   "function": "GameplayStatics:GetGameMode"
+  },
+  {
+   "id": "n40",
+   "op": "self"
+  },
+  {
+   "id": "n41",
+   "op": "call",
+   "function": "IPRGameMode:TransferToLevel"
+  },
+  {
+   "id": "n42",
+   "op": "get",
+   "var": "ToTag"
+  },
+  {
+   "id": "n43",
+   "op": "get",
+   "var": "AtGate"
+  },
+  {
+   "id": "n44",
+   "op": "get",
+   "var": "HubTag"
+  },
+  {
+   "id": "n45",
+   "op": "call",
+   "function": "GameplayStatics:GetGameMode"
+  },
+  {
+   "id": "n46",
+   "op": "self"
+  },
+  {
+   "id": "n47",
+   "op": "cast",
+   "class": "IPRGameMode"
+  },
+  {
+   "id": "n48",
+   "op": "call",
+   "function": "IPRGameMode:TransferToLevel"
+  },
+  {
+   "id": "n49",
+   "op": "custom_event",
+   "name": "SaveAt"
+  },
+  {
+   "id": "n50",
+   "op": "call",
+   "function": "PRGameData:GetGameData"
+  },
+  {
+   "id": "n51",
+   "op": "call",
+   "function": "KismetMathLibrary:MakeTransform",
+   "pins": {
+    "Scale": "1,1,1"
+   }
+  },
+  {
+   "id": "n52",
+   "op": "get",
+   "var": "AtLoc"
+  },
+  {
+   "id": "n53",
+   "op": "call",
+   "function": "KismetMathLibrary:MakeRotator",
+   "pins": {
+    "Roll": 0,
+    "Pitch": 0
+   }
+  },
+  {
+   "id": "n54",
+   "op": "get",
+   "var": "AtYaw"
+  },
+  {
+   "id": "n55",
+   "op": "get",
+   "var": "PlayerData",
+   "class": "/Script/IntoTheRadius.PRGameData"
+  },
+  {
+   "id": "n56",
+   "op": "call",
+   "function": "PlayerGameData:SavePosition",
+   "pins": {
+    "Velocity": "0,0,0"
+   }
+  },
+  {
+   "id": "n57",
+   "op": "get",
+   "var": "ToTag"
+  },
+  {
+   "id": "n58",
+   "op": "custom_event",
+   "name": "HTStartAt"
+  },
+  {
+   "id": "n59",
+   "op": "branch"
+  },
+  {
+   "id": "n60",
+   "op": "get",
+   "var": "PendingAt"
+  },
+  {
+   "id": "n61",
+   "op": "call",
+   "function": "SaveAt"
+  },
+  {
+   "id": "n62",
+   "op": "self"
+  },
+  {
+   "id": "n63",
+   "op": "custom_event",
+   "name": "HLPrepAt",
+   "params": [
+    {
+     "name": "Value",
+     "type": "struct:GameplayTag"
+    }
+   ]
+  },
+  {
+   "id": "n64",
+   "op": "branch"
+  },
+  {
+   "id": "n65",
+   "op": "get",
+   "var": "PendingAt"
+  },
+  {
+   "id": "n66",
+   "op": "call",
+   "function": "SaveAt"
+  },
+  {
+   "id": "n67",
+   "op": "self"
+  },
+  {
+   "id": "n68",
+   "op": "custom_event",
+   "name": "HTEndAt"
+  },
+  {
+   "id": "n69",
+   "op": "set",
+   "var": "PendingAt",
+   "pins": {
+    "PendingAt": false
+   }
+  },
+  {
+   "id": "n70",
+   "op": "custom_event",
+   "name": "EndTarget",
+   "params": [
+    {
+     "name": "EndedActor",
+     "type": "object:/Script/Engine.Actor"
+    },
+    {
+     "name": "Reason",
+     "type": "byte"
+    }
+   ]
+  },
+  {
+   "id": "n71",
+   "op": "set",
+   "var": "Target"
+  },
+  {
+   "id": "n72",
+   "op": "custom_event",
+   "name": "BindEnd"
+  },
+  {
+   "id": "n73",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n74",
+   "op": "create_delegate",
+   "function": "EndTarget"
+  },
+  {
+   "id": "n75",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/Engine.Actor',MemberName=\"OnEndPlay\")"
+   }
+  },
+  {
+   "id": "n76",
+   "op": "custom_event",
+   "name": "FindByName",
+   "params": [
+    {
+     "name": "ObjPath",
+     "type": "string"
+    }
+   ]
+  },
+  {
+   "id": "n77",
+   "op": "set",
+   "var": "Found"
+  },
+  {
+   "id": "n78",
+   "op": "call",
+   "function": "GameplayStatics:GetAllActorsOfClass",
+   "pins": {
+    "ActorClass": "/Script/Engine.Actor"
+   }
+  },
+  {
+   "id": "n79",
+   "op": "self"
+  },
+  {
+   "id": "n80",
+   "op": "macro",
+   "macro": "ForEachLoop"
+  },
+  {
+   "id": "n81",
+   "op": "call",
+   "function": "KismetSystemLibrary:GetPathName"
+  },
+  {
+   "id": "n82",
+   "op": "call",
+   "function": "KismetStringLibrary:EqualEqual_StriStri"
+  },
+  {
+   "id": "n83",
+   "op": "branch"
+  },
+  {
+   "id": "n84",
+   "op": "set",
+   "var": "Found"
+  },
+  {
+   "id": "n85",
+   "op": "custom_event",
+   "name": "AttachCollision",
+   "params": [
+    {
+     "name": "TargetActor",
+     "type": "object:/Script/Engine.Actor"
+    }
+   ]
+  },
+  {
+   "id": "n86",
+   "op": "set",
+   "var": "Target"
+  },
+  {
+   "id": "n87",
+   "op": "set",
+   "var": "Result",
+   "pins": {
+    "Result": 0
+   }
+  },
+  {
+   "id": "n88",
+   "op": "set",
+   "var": "Primitives",
+   "pins": {
+    "Primitives": 0
+   }
+  },
+  {
+   "id": "n89",
+   "op": "set",
+   "var": "Touchable",
+   "pins": {
+    "Touchable": 0
+   }
+  },
+  {
+   "id": "n90",
+   "op": "call",
+   "function": "Actor:K2_GetComponentsByClass",
+   "pins": {
+    "ComponentClass": "/Script/Engine.PrimitiveComponent"
+   }
+  },
+  {
+   "id": "n91",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n92",
+   "op": "macro",
+   "macro": "ForEachLoop"
+  },
+  {
+   "id": "n93",
+   "op": "cast",
+   "class": "PrimitiveComponent",
+   "pure": false
+  },
+  {
+   "id": "n94",
+   "op": "call",
+   "function": "KismetMathLibrary:Add_IntInt",
+   "pins": {
+    "B": 1
+   }
+  },
+  {
+   "id": "n95",
+   "op": "get",
+   "var": "Primitives"
+  },
+  {
+   "id": "n96",
+   "op": "set",
+   "var": "Primitives"
+  },
+  {
+   "id": "n97",
+   "op": "call",
+   "function": "PrimitiveComponent:GetCollisionResponseToChannel",
+   "pins": {
+    "Channel": "ECC_Pawn"
+   }
+  },
+  {
+   "id": "n98",
+   "op": "call",
+   "function": "KismetMathLibrary:EqualEqual_ByteByte",
+   "pins": {
+    "B": 1
+   }
+  },
+  {
+   "id": "n99",
+   "op": "branch"
+  },
+  {
+   "id": "n100",
+   "op": "call",
+   "function": "KismetMathLibrary:Add_IntInt",
+   "pins": {
+    "B": 1
+   }
+  },
+  {
+   "id": "n101",
+   "op": "get",
+   "var": "Touchable"
+  },
+  {
+   "id": "n102",
+   "op": "set",
+   "var": "Touchable"
+  },
+  {
+   "id": "n103",
+   "op": "create_delegate",
+   "function": "OnBegin"
+  },
+  {
+   "id": "n104",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/Engine.PrimitiveComponent',MemberName=\"OnComponentBeginOverlap\")"
+   }
+  },
+  {
+   "id": "n105",
+   "op": "create_delegate",
+   "function": "OnEnd"
+  },
+  {
+   "id": "n106",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/Engine.PrimitiveComponent',MemberName=\"OnComponentEndOverlap\")"
+   }
+  },
+  {
+   "id": "n107",
+   "op": "call",
+   "function": "GameplayStatics:GetPlayerPawn",
+   "pins": {
+    "PlayerIndex": 0
+   }
+  },
+  {
+   "id": "n108",
+   "op": "self"
+  },
+  {
+   "id": "n109",
+   "op": "call",
+   "function": "Actor:K2_GetRootComponent"
+  },
+  {
+   "id": "n110",
+   "op": "cast",
+   "class": "PrimitiveComponent",
+   "pure": false
+  },
+  {
+   "id": "n111",
+   "op": "call",
+   "function": "PrimitiveComponent:IsOverlappingActor"
+  },
+  {
+   "id": "n112",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n113",
+   "op": "call",
+   "function": "KismetMathLibrary:Not_PreBool"
+  },
+  {
+   "id": "n114",
+   "op": "set",
+   "var": "Armed"
+  },
+  {
+   "id": "n115",
+   "op": "call",
+   "function": "BindEnd"
+  },
+  {
+   "id": "n116",
+   "op": "self"
+  },
+  {
+   "id": "n117",
+   "op": "call",
+   "function": "KismetMathLibrary:Greater_IntInt",
+   "pins": {
+    "B": 0
+   }
+  },
+  {
+   "id": "n118",
+   "op": "get",
+   "var": "Primitives"
+  },
+  {
+   "id": "n119",
+   "op": "branch"
+  },
+  {
+   "id": "n120",
+   "op": "call",
+   "function": "KismetMathLibrary:Greater_IntInt",
+   "pins": {
+    "B": 0
+   }
+  },
+  {
+   "id": "n121",
+   "op": "get",
+   "var": "Touchable"
+  },
+  {
+   "id": "n122",
+   "op": "branch"
+  },
+  {
+   "id": "n123",
+   "op": "set",
+   "var": "Result",
+   "pins": {
+    "Result": 1
+   }
+  },
+  {
+   "id": "n124",
+   "op": "set",
+   "var": "Result",
+   "pins": {
+    "Result": 2
+   }
+  },
+  {
+   "id": "n125",
+   "op": "custom_event",
+   "name": "OnBegin",
+   "params": [
+    {
+     "name": "OverlappedComponent",
+     "type": "object:/Script/Engine.PrimitiveComponent"
+    },
+    {
+     "name": "OtherActor",
+     "type": "object:/Script/Engine.Actor"
+    },
+    {
+     "name": "OtherComp",
+     "type": "object:/Script/Engine.PrimitiveComponent"
+    },
+    {
+     "name": "OtherBodyIndex",
+     "type": "int"
+    },
+    {
+     "name": "bFromSweep",
+     "type": "bool"
+    },
+    {
+     "name": "SweepResult",
+     "type": "struct:HitResult&"
+    }
+   ]
+  },
+  {
+   "id": "n126",
+   "op": "call",
+   "function": "GameplayStatics:GetPlayerPawn",
+   "pins": {
+    "PlayerIndex": 0
+   }
+  },
+  {
+   "id": "n127",
+   "op": "self"
+  },
+  {
+   "id": "n128",
+   "op": "call",
+   "function": "KismetMathLibrary:EqualEqual_ObjectObject"
+  },
+  {
+   "id": "n129",
+   "op": "branch"
+  },
+  {
+   "id": "n130",
+   "op": "call",
+   "function": "GameplayStatics:GetPlayerPawn",
+   "pins": {
+    "PlayerIndex": 0
+   }
+  },
+  {
+   "id": "n131",
+   "op": "self"
+  },
+  {
+   "id": "n132",
+   "op": "call",
+   "function": "Actor:K2_GetRootComponent"
+  },
+  {
+   "id": "n133",
+   "op": "call",
+   "function": "KismetMathLibrary:EqualEqual_ObjectObject"
+  },
+  {
+   "id": "n134",
+   "op": "branch"
+  },
+  {
+   "id": "n135",
+   "op": "branch"
+  },
+  {
+   "id": "n136",
+   "op": "get",
+   "var": "Armed"
+  },
+  {
+   "id": "n137",
+   "op": "set",
+   "var": "Armed",
+   "pins": {
+    "Armed": false
+   }
+  },
+  {
+   "id": "n138",
+   "op": "call",
+   "function": "GameplayStatics:GetGameMode"
+  },
+  {
+   "id": "n139",
+   "op": "self"
+  },
+  {
+   "id": "n140",
+   "op": "cast",
+   "class": "IPRGameModeNative"
+  },
+  {
+   "id": "n141",
+   "op": "call",
+   "function": "IPRGameModeNative:GetIsInTransition"
+  },
+  {
+   "id": "n142",
+   "op": "branch"
+  },
+  {
+   "id": "n143",
+   "op": "call",
+   "function": "Fire"
+  },
+  {
+   "id": "n144",
+   "op": "self"
+  },
+  {
+   "id": "n145",
+   "op": "custom_event",
+   "name": "OnEnd",
+   "params": [
+    {
+     "name": "OverlappedComponent",
+     "type": "object:/Script/Engine.PrimitiveComponent"
+    },
+    {
+     "name": "OtherActor",
+     "type": "object:/Script/Engine.Actor"
+    },
+    {
+     "name": "OtherComp",
+     "type": "object:/Script/Engine.PrimitiveComponent"
+    },
+    {
+     "name": "OtherBodyIndex",
+     "type": "int"
+    }
+   ]
+  },
+  {
+   "id": "n146",
+   "op": "call",
+   "function": "GameplayStatics:GetPlayerPawn",
+   "pins": {
+    "PlayerIndex": 0
+   }
+  },
+  {
+   "id": "n147",
+   "op": "self"
+  },
+  {
+   "id": "n148",
+   "op": "call",
+   "function": "KismetMathLibrary:EqualEqual_ObjectObject"
+  },
+  {
+   "id": "n149",
+   "op": "branch"
+  },
+  {
+   "id": "n150",
+   "op": "call",
+   "function": "GameplayStatics:GetPlayerPawn",
+   "pins": {
+    "PlayerIndex": 0
+   }
+  },
+  {
+   "id": "n151",
+   "op": "self"
+  },
+  {
+   "id": "n152",
+   "op": "call",
+   "function": "Actor:K2_GetRootComponent"
+  },
+  {
+   "id": "n153",
+   "op": "call",
+   "function": "KismetMathLibrary:EqualEqual_ObjectObject"
+  },
+  {
+   "id": "n154",
+   "op": "branch"
+  },
+  {
+   "id": "n155",
+   "op": "call",
+   "function": "PrimitiveComponent:IsOverlappingActor"
+  },
+  {
+   "id": "n156",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n157",
+   "op": "branch"
+  },
+  {
+   "id": "n158",
+   "op": "set",
+   "var": "Armed",
+   "pins": {
+    "Armed": true
+   }
+  },
+  {
+   "id": "n159",
+   "op": "custom_event",
+   "name": "AttachGrab",
+   "params": [
+    {
+     "name": "TargetActor",
+     "type": "object:/Script/Engine.Actor"
+    }
+   ]
+  },
+  {
+   "id": "n160",
+   "op": "set",
+   "var": "Target"
+  },
+  {
+   "id": "n161",
+   "op": "set",
+   "var": "Result",
+   "pins": {
+    "Result": 0
+   }
+  },
+  {
+   "id": "n162",
+   "op": "call",
+   "function": "BindEnd"
+  },
+  {
+   "id": "n163",
+   "op": "self"
+  },
+  {
+   "id": "n164",
+   "op": "call",
+   "function": "CheckHand"
+  },
+  {
+   "id": "n165",
+   "op": "self"
+  },
+  {
+   "id": "n166",
+   "op": "cast",
+   "class": "/Script/VRExpansionPlugin.GrippableActor",
+   "pure": false
+  },
+  {
+   "id": "n167",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n168",
+   "op": "create_delegate",
+   "function": "OnGripped"
+  },
+  {
+   "id": "n169",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/VRExpansionPlugin.GrippableActor',MemberName=\"OnGripped\")"
+   }
+  },
+  {
+   "id": "n170",
+   "op": "cast",
+   "class": "/Script/VRExpansionPlugin.GrippableStaticMeshActor",
+   "pure": false
+  },
+  {
+   "id": "n171",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n172",
+   "op": "create_delegate",
+   "function": "OnGripped"
+  },
+  {
+   "id": "n173",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/VRExpansionPlugin.GrippableStaticMeshActor',MemberName=\"OnGripped\")"
+   }
+  },
+  {
+   "id": "n174",
+   "op": "cast",
+   "class": "/Script/VRExpansionPlugin.GrippableSkeletalMeshActor",
+   "pure": false
+  },
+  {
+   "id": "n175",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n176",
+   "op": "create_delegate",
+   "function": "OnGripped"
+  },
+  {
+   "id": "n177",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/VRExpansionPlugin.GrippableSkeletalMeshActor',MemberName=\"OnGripped\")"
+   }
+  },
+  {
+   "id": "n178",
+   "op": "custom_event",
+   "name": "CheckHand"
+  },
+  {
+   "id": "n179",
+   "op": "set",
+   "var": "Touchable",
+   "pins": {
+    "Touchable": 0
+   }
+  },
+  {
+   "id": "n180",
+   "op": "call",
+   "function": "Actor:K2_GetComponentsByClass",
+   "pins": {
+    "ComponentClass": "/Script/Engine.PrimitiveComponent"
+   }
+  },
+  {
+   "id": "n181",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n182",
+   "op": "macro",
+   "macro": "ForEachLoop"
+  },
+  {
+   "id": "n183",
+   "op": "cast",
+   "class": "PrimitiveComponent",
+   "pure": false
+  },
+  {
+   "id": "n184",
+   "op": "call",
+   "function": "PrimitiveComponent:GetCollisionResponseToChannel",
+   "pins": {
+    "Channel": "ECC_GameTraceChannel3"
+   }
+  },
+  {
+   "id": "n185",
+   "op": "call",
+   "function": "KismetMathLibrary:NotEqual_ByteByte",
+   "pins": {
+    "B": 0
+   }
+  },
+  {
+   "id": "n186",
+   "op": "branch"
+  },
+  {
+   "id": "n187",
+   "op": "call",
+   "function": "KismetMathLibrary:Add_IntInt",
+   "pins": {
+    "B": 1
+   }
+  },
+  {
+   "id": "n188",
+   "op": "get",
+   "var": "Touchable"
+  },
+  {
+   "id": "n189",
+   "op": "set",
+   "var": "Touchable"
+  },
+  {
+   "id": "n190",
+   "op": "call",
+   "function": "KismetMathLibrary:Greater_IntInt",
+   "pins": {
+    "B": 0
+   }
+  },
+  {
+   "id": "n191",
+   "op": "get",
+   "var": "Touchable"
+  },
+  {
+   "id": "n192",
+   "op": "branch"
+  },
+  {
+   "id": "n193",
+   "op": "set",
+   "var": "Result",
+   "pins": {
+    "Result": 1
+   }
+  },
+  {
+   "id": "n194",
+   "op": "set",
+   "var": "Result",
+   "pins": {
+    "Result": 2
+   }
+  },
+  {
+   "id": "n195",
+   "op": "custom_event",
+   "name": "OnGripped",
+   "params": [
+    {
+     "name": "GrippingController",
+     "type": "object:/Script/VRExpansionPlugin.GripMotionControllerComponent"
+    },
+    {
+     "name": "GripInformation",
+     "type": "struct:BPActorGripInformation&"
+    }
+   ]
+  },
+  {
+   "id": "n196",
+   "op": "branch"
+  },
+  {
+   "id": "n197",
+   "op": "get",
+   "var": "Busy"
+  },
+  {
+   "id": "n198",
+   "op": "call",
+   "function": "GameplayStatics:GetGameMode"
+  },
+  {
+   "id": "n199",
+   "op": "self"
+  },
+  {
+   "id": "n200",
+   "op": "cast",
+   "class": "IPRGameModeNative"
+  },
+  {
+   "id": "n201",
+   "op": "call",
+   "function": "IPRGameModeNative:GetIsInTransition"
+  },
+  {
+   "id": "n202",
+   "op": "branch"
+  },
+  {
+   "id": "n203",
+   "op": "set",
+   "var": "Busy",
+   "pins": {
+    "Busy": true
+   }
+  },
+  {
+   "id": "n204",
+   "op": "call",
+   "function": "GripMotionControllerComponent:DropObjectByInterface"
+  },
+  {
+   "id": "n205",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n206",
+   "op": "call",
+   "function": "Fire"
+  },
+  {
+   "id": "n207",
+   "op": "self"
+  },
+  {
+   "id": "n208",
+   "op": "set",
+   "var": "Busy",
+   "pins": {
+    "Busy": false
+   }
+  },
+  {
+   "id": "n209",
+   "op": "custom_event",
+   "name": "Start"
+  },
+  {
+   "id": "n210",
+   "op": "branch"
+  },
+  {
+   "id": "n211",
+   "op": "get",
+   "var": "HasAtPos"
+  },
+  {
+   "id": "n212",
+   "op": "call",
+   "function": "EventsManager:GetEventsManager"
+  },
+  {
+   "id": "n213",
+   "op": "create_delegate",
+   "function": "HTStartAt"
+  },
+  {
+   "id": "n214",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/IntoTheRadius.EventsManager',MemberName=\"OnTransitionStart\")"
+   }
+  },
+  {
+   "id": "n215",
+   "op": "create_delegate",
+   "function": "HLPrepAt"
+  },
+  {
+   "id": "n216",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/IntoTheRadius.EventsManager',MemberName=\"OnLevelPrepare\")"
+   }
+  },
+  {
+   "id": "n217",
+   "op": "create_delegate",
+   "function": "HTEndAt"
+  },
+  {
+   "id": "n218",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/IntoTheRadius.EventsManager',MemberName=\"OnTransitionEnd\")"
+   }
+  },
+  {
+   "id": "n219",
+   "op": "call",
+   "function": "BindStream"
+  },
+  {
+   "id": "n220",
+   "op": "self"
+  },
+  {
+   "id": "n221",
+   "op": "custom_event",
+   "name": "BindStream"
+  },
+  {
+   "id": "n222",
+   "op": "call",
+   "function": "KismetStringLibrary:Conv_StringToName"
+  },
+  {
+   "id": "n223",
+   "op": "get",
+   "var": "StreamName"
+  },
+  {
+   "id": "n224",
+   "op": "call",
+   "function": "GameplayStatics:GetStreamingLevel"
+  },
+  {
+   "id": "n225",
+   "op": "self"
+  },
+  {
+   "id": "n226",
+   "op": "set",
+   "var": "Stream"
+  },
+  {
+   "id": "n227",
+   "op": "get",
+   "var": "Stream"
+  },
+  {
+   "id": "n228",
+   "op": "call",
+   "function": "KismetSystemLibrary:IsValid"
+  },
+  {
+   "id": "n229",
+   "op": "branch"
+  },
+  {
+   "id": "n230",
+   "op": "get",
+   "var": "Stream"
+  },
+  {
+   "id": "n231",
+   "op": "create_delegate",
+   "function": "HShown"
+  },
+  {
+   "id": "n232",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/Engine.LevelStreaming',MemberName=\"OnLevelShown\")"
+   }
+  },
+  {
+   "id": "n233",
+   "op": "call",
+   "function": "LevelStreaming:IsLevelVisible"
+  },
+  {
+   "id": "n234",
+   "op": "get",
+   "var": "Stream"
+  },
+  {
+   "id": "n235",
+   "op": "branch"
+  },
+  {
+   "id": "n236",
+   "op": "call",
+   "function": "HShown"
+  },
+  {
+   "id": "n237",
+   "op": "self"
+  },
+  {
+   "id": "n238",
+   "op": "branch"
+  },
+  {
+   "id": "n239",
+   "op": "call",
+   "function": "KismetMathLibrary:Not_PreBool"
+  },
+  {
+   "id": "n240",
+   "op": "get",
+   "var": "Retrying"
+  },
+  {
+   "id": "n241",
+   "op": "set",
+   "var": "Retrying",
+   "pins": {
+    "Retrying": true
+   }
+  },
+  {
+   "id": "n242",
+   "op": "call",
+   "function": "EventsManager:GetEventsManager"
+  },
+  {
+   "id": "n243",
+   "op": "create_delegate",
+   "function": "HRetry"
+  },
+  {
+   "id": "n244",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/IntoTheRadius.EventsManager',MemberName=\"OnLevelStarted\")"
+   }
+  },
+  {
+   "id": "n245",
+   "op": "custom_event",
+   "name": "HRetry",
+   "params": [
+    {
+     "name": "Value",
+     "type": "struct:GameplayTag"
+    }
+   ]
+  },
+  {
+   "id": "n246",
+   "op": "get",
+   "var": "Stream"
+  },
+  {
+   "id": "n247",
+   "op": "call",
+   "function": "KismetSystemLibrary:IsValid"
+  },
+  {
+   "id": "n248",
+   "op": "call",
+   "function": "KismetMathLibrary:Not_PreBool"
+  },
+  {
+   "id": "n249",
+   "op": "branch"
+  },
+  {
+   "id": "n250",
+   "op": "call",
+   "function": "BindStream"
+  },
+  {
+   "id": "n251",
+   "op": "self"
+  },
+  {
+   "id": "n252",
+   "op": "custom_event",
+   "name": "HShown"
+  },
+  {
+   "id": "n253",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n254",
+   "op": "call",
+   "function": "KismetSystemLibrary:IsValid"
+  },
+  {
+   "id": "n255",
+   "op": "call",
+   "function": "KismetMathLibrary:Not_PreBool"
+  },
+  {
+   "id": "n256",
+   "op": "branch"
+  },
+  {
+   "id": "n257",
+   "op": "call",
+   "function": "LevelStreaming:GetLoadedLevel"
+  },
+  {
+   "id": "n258",
+   "op": "get",
+   "var": "Stream"
+  },
+  {
+   "id": "n259",
+   "op": "call",
+   "function": "KismetSystemLibrary:GetPathName"
+  },
+  {
+   "id": "n260",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "B": "."
+   }
+  },
+  {
+   "id": "n261",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr"
+  },
+  {
+   "id": "n262",
+   "op": "get",
+   "var": "ObjectName"
+  },
+  {
+   "id": "n263",
+   "op": "call",
+   "function": "FindByName"
+  },
+  {
+   "id": "n264",
+   "op": "self"
+  },
+  {
+   "id": "n265",
+   "op": "get",
+   "var": "Found"
+  },
+  {
+   "id": "n266",
+   "op": "call",
+   "function": "KismetSystemLibrary:IsValid"
+  },
+  {
+   "id": "n267",
+   "op": "branch"
+  },
+  {
+   "id": "n268",
+   "op": "get",
+   "var": "Where"
+  },
+  {
+   "id": "n269",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "itrmaps log "
+   }
+  },
+  {
+   "id": "n270",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "B": " : the object was not found in its level"
+   }
+  },
+  {
+   "id": "n271",
+   "op": "call",
+   "function": "KismetSystemLibrary:ExecuteConsoleCommand"
+  },
+  {
+   "id": "n272",
+   "op": "self"
+  },
+  {
+   "id": "n273",
+   "op": "branch"
+  },
+  {
+   "id": "n274",
+   "op": "get",
+   "var": "Grab"
+  },
+  {
+   "id": "n275",
+   "op": "call",
+   "function": "AttachCollision"
+  },
+  {
+   "id": "n276",
+   "op": "self"
+  },
+  {
+   "id": "n277",
+   "op": "get",
+   "var": "Found"
+  },
+  {
+   "id": "n278",
+   "op": "call",
+   "function": "AttachGrab"
+  },
+  {
+   "id": "n279",
+   "op": "self"
+  },
+  {
+   "id": "n280",
+   "op": "get",
+   "var": "Found"
+  },
+  {
+   "id": "n281",
+   "op": "call",
+   "function": "KismetMathLibrary:EqualEqual_IntInt",
+   "pins": {
+    "B": 2
+   }
+  },
+  {
+   "id": "n282",
+   "op": "get",
+   "var": "Result"
+  },
+  {
+   "id": "n283",
+   "op": "branch"
+  },
+  {
+   "id": "n284",
+   "op": "call",
+   "function": "KismetStringLibrary:Conv_IntToString"
+  },
+  {
+   "id": "n285",
+   "op": "get",
+   "var": "Result"
+  },
+  {
+   "id": "n286",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "itrmaps log "
+   }
+  },
+  {
+   "id": "n287",
+   "op": "get",
+   "var": "Where"
+  },
+  {
+   "id": "n288",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "B": " : bound, result "
+   }
+  },
+  {
+   "id": "n289",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr"
+  },
+  {
+   "id": "n290",
+   "op": "call",
+   "function": "KismetSystemLibrary:ExecuteConsoleCommand"
+  },
+  {
+   "id": "n291",
+   "op": "self"
+  },
+  {
+   "id": "n292",
+   "op": "get",
+   "var": "Where"
+  },
+  {
+   "id": "n293",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "itrmaps log "
+   }
+  },
+  {
+   "id": "n294",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "B": " : found, but the player cannot touch it (collision: no part overlaps the player; grab: every part ignores the hand)"
+   }
+  },
+  {
+   "id": "n295",
+   "op": "call",
+   "function": "KismetSystemLibrary:ExecuteConsoleCommand"
+  },
+  {
+   "id": "n296",
+   "op": "self"
+  }
+ ],
+ "links": [
+  [
+   "n2.Where",
+   "n3.B"
+  ],
+  [
+   "n3.ReturnValue",
+   "n4.A"
+  ],
+  [
+   "n4.ReturnValue",
+   "n5.Command"
+  ],
+  [
+   "n6.self",
+   "n5.WorldContextObject"
+  ],
+  [
+   "n1.then",
+   "n5.execute"
+  ],
+  [
+   "n9.Kind",
+   "n8.A"
+  ],
+  [
+   "n8.ReturnValue",
+   "n7.Condition"
+  ],
+  [
+   "n5.then",
+   "n7.execute"
+  ],
+  [
+   "n11.Entry",
+   "n10.self"
+  ],
+  [
+   "n7.True",
+   "n10.execute"
+  ],
+  [
+   "n13.ToMissing",
+   "n12.Condition"
+  ],
+  [
+   "n7.False",
+   "n12.execute"
+  ],
+  [
+   "n15.Note",
+   "n14.B"
+  ],
+  [
+   "n14.ReturnValue",
+   "n16.Command"
+  ],
+  [
+   "n17.self",
+   "n16.WorldContextObject"
+  ],
+  [
+   "n12.True",
+   "n16.execute"
+  ],
+  [
+   "n19.Entry",
+   "n18.self"
+  ],
+  [
+   "n12.False",
+   "n18.execute"
+  ],
+  [
+   "n20.Dest",
+   "n21.Object"
+  ],
+  [
+   "n21.ReturnValue",
+   "n22.Condition"
+  ],
+  [
+   "n18.then",
+   "n22.execute"
+  ],
+  [
+   "n24.Dest",
+   "n23.self"
+  ],
+  [
+   "n22.True",
+   "n23.execute"
+  ],
+  [
+   "n26.HasTo",
+   "n25.Condition"
+  ],
+  [
+   "n22.False",
+   "n25.execute"
+  ],
+  [
+   "n28.HasAtPos",
+   "n27.Condition"
+  ],
+  [
+   "n25.True",
+   "n27.execute"
+  ],
+  [
+   "n27.True",
+   "n29.execute"
+  ],
+  [
+   "n31.self",
+   "n30.self"
+  ],
+  [
+   "n29.then",
+   "n30.execute"
+  ],
+  [
+   "n35.self",
+   "n34.WorldContextObject"
+  ],
+  [
+   "n34.ReturnValue",
+   "n36.Object"
+  ],
+  [
+   "n30.then",
+   "n36.execute"
+  ],
+  [
+   "n36.as",
+   "n37.self"
+  ],
+  [
+   "n32.ToTag",
+   "n37.LevelTag"
+  ],
+  [
+   "n36.then",
+   "n37.execute"
+  ],
+  [
+   "n33.AtGate",
+   "n37.LocationTag"
+  ],
+  [
+   "n40.self",
+   "n39.WorldContextObject"
+  ],
+  [
+   "n39.ReturnValue",
+   "n38.Object"
+  ],
+  [
+   "n27.False",
+   "n38.execute"
+  ],
+  [
+   "n38.as",
+   "n41.self"
+  ],
+  [
+   "n42.ToTag",
+   "n41.LevelTag"
+  ],
+  [
+   "n43.AtGate",
+   "n41.LocationTag"
+  ],
+  [
+   "n38.then",
+   "n41.execute"
+  ],
+  [
+   "n46.self",
+   "n45.WorldContextObject"
+  ],
+  [
+   "n45.ReturnValue",
+   "n47.Object"
+  ],
+  [
+   "n25.False",
+   "n47.execute"
+  ],
+  [
+   "n47.as",
+   "n48.self"
+  ],
+  [
+   "n44.HubTag",
+   "n48.LevelTag"
+  ],
+  [
+   "n47.then",
+   "n48.execute"
+  ],
+  [
+   "n52.AtLoc",
+   "n51.Location"
+  ],
+  [
+   "n54.AtYaw",
+   "n53.Yaw"
+  ],
+  [
+   "n53.ReturnValue",
+   "n51.Rotation"
+  ],
+  [
+   "n50.GameData",
+   "n55.self"
+  ],
+  [
+   "n55.PlayerData",
+   "n56.self"
+  ],
+  [
+   "n57.ToTag",
+   "n56.InLevel"
+  ],
+  [
+   "n51.ReturnValue",
+   "n56.Position"
+  ],
+  [
+   "n49.then",
+   "n56.execute"
+  ],
+  [
+   "n60.PendingAt",
+   "n59.Condition"
+  ],
+  [
+   "n58.then",
+   "n59.execute"
+  ],
+  [
+   "n62.self",
+   "n61.self"
+  ],
+  [
+   "n59.True",
+   "n61.execute"
+  ],
+  [
+   "n65.PendingAt",
+   "n64.Condition"
+  ],
+  [
+   "n63.then",
+   "n64.execute"
+  ],
+  [
+   "n67.self",
+   "n66.self"
+  ],
+  [
+   "n64.True",
+   "n66.execute"
+  ],
+  [
+   "n68.then",
+   "n69.execute"
+  ],
+  [
+   "n70.then",
+   "n71.execute"
+  ],
+  [
+   "n73.Target",
+   "n75.self"
+  ],
+  [
+   "n74.OutputDelegate",
+   "n75.delegate"
+  ],
+  [
+   "n72.then",
+   "n75.execute"
+  ],
+  [
+   "n79.self",
+   "n78.WorldContextObject"
+  ],
+  [
+   "n78.OutActors",
+   "n80.Array"
+  ],
+  [
+   "n76.then",
+   "n77.execute"
+  ],
+  [
+   "n77.then",
+   "n78.execute"
+  ],
+  [
+   "n78.then",
+   "n80.Exec"
+  ],
+  [
+   "n80.ArrayElement",
+   "n81.Object"
+  ],
+  [
+   "n81.ReturnValue",
+   "n82.A"
+  ],
+  [
+   "n76.ObjPath",
+   "n82.B"
+  ],
+  [
+   "n82.ReturnValue",
+   "n83.Condition"
+  ],
+  [
+   "n80.LoopBody",
+   "n83.execute"
+  ],
+  [
+   "n80.ArrayElement",
+   "n84.Found"
+  ],
+  [
+   "n83.True",
+   "n84.execute"
+  ],
+  [
+   "n85.TargetActor",
+   "n86.Target"
+  ],
+  [
+   "n85.then",
+   "n86.execute"
+  ],
+  [
+   "n86.then",
+   "n87.execute"
+  ],
+  [
+   "n87.then",
+   "n88.execute"
+  ],
+  [
+   "n88.then",
+   "n89.execute"
+  ],
+  [
+   "n91.Target",
+   "n90.self"
+  ],
+  [
+   "n90.ReturnValue",
+   "n92.Array"
+  ],
+  [
+   "n89.then",
+   "n92.Exec"
+  ],
+  [
+   "n92.LoopBody",
+   "n93.execute"
+  ],
+  [
+   "n92.ArrayElement",
+   "n93.Object"
+  ],
+  [
+   "n95.Primitives",
+   "n94.A"
+  ],
+  [
+   "n94.ReturnValue",
+   "n96.Primitives"
+  ],
+  [
+   "n93.then",
+   "n96.execute"
+  ],
+  [
+   "n93.as",
+   "n97.self"
+  ],
+  [
+   "n97.ReturnValue",
+   "n98.A"
+  ],
+  [
+   "n98.ReturnValue",
+   "n99.Condition"
+  ],
+  [
+   "n96.then",
+   "n99.execute"
+  ],
+  [
+   "n101.Touchable",
+   "n100.A"
+  ],
+  [
+   "n100.ReturnValue",
+   "n102.Touchable"
+  ],
+  [
+   "n99.True",
+   "n102.execute"
+  ],
+  [
+   "n93.as",
+   "n104.self"
+  ],
+  [
+   "n103.OutputDelegate",
+   "n104.delegate"
+  ],
+  [
+   "n102.then",
+   "n104.execute"
+  ],
+  [
+   "n93.as",
+   "n106.self"
+  ],
+  [
+   "n105.OutputDelegate",
+   "n106.delegate"
+  ],
+  [
+   "n104.then",
+   "n106.execute"
+  ],
+  [
+   "n99.False",
+   "n104.execute"
+  ],
+  [
+   "n108.self",
+   "n107.WorldContextObject"
+  ],
+  [
+   "n107.ReturnValue",
+   "n109.self"
+  ],
+  [
+   "n109.ReturnValue",
+   "n110.Object"
+  ],
+  [
+   "n92.Completed",
+   "n110.execute"
+  ],
+  [
+   "n110.as",
+   "n111.self"
+  ],
+  [
+   "n112.Target",
+   "n111.Other"
+  ],
+  [
+   "n111.ReturnValue",
+   "n113.A"
+  ],
+  [
+   "n113.ReturnValue",
+   "n114.Armed"
+  ],
+  [
+   "n110.then",
+   "n114.execute"
+  ],
+  [
+   "n110.CastFailed",
+   "n114.execute"
+  ],
+  [
+   "n116.self",
+   "n115.self"
+  ],
+  [
+   "n114.then",
+   "n115.execute"
+  ],
+  [
+   "n118.Primitives",
+   "n117.A"
+  ],
+  [
+   "n117.ReturnValue",
+   "n119.Condition"
+  ],
+  [
+   "n115.then",
+   "n119.execute"
+  ],
+  [
+   "n121.Touchable",
+   "n120.A"
+  ],
+  [
+   "n120.ReturnValue",
+   "n122.Condition"
+  ],
+  [
+   "n119.True",
+   "n122.execute"
+  ],
+  [
+   "n122.True",
+   "n123.execute"
+  ],
+  [
+   "n122.False",
+   "n124.execute"
+  ],
+  [
+   "n127.self",
+   "n126.WorldContextObject"
+  ],
+  [
+   "n125.OtherActor",
+   "n128.A"
+  ],
+  [
+   "n126.ReturnValue",
+   "n128.B"
+  ],
+  [
+   "n128.ReturnValue",
+   "n129.Condition"
+  ],
+  [
+   "n125.then",
+   "n129.execute"
+  ],
+  [
+   "n131.self",
+   "n130.WorldContextObject"
+  ],
+  [
+   "n130.ReturnValue",
+   "n132.self"
+  ],
+  [
+   "n125.OtherComp",
+   "n133.A"
+  ],
+  [
+   "n132.ReturnValue",
+   "n133.B"
+  ],
+  [
+   "n133.ReturnValue",
+   "n134.Condition"
+  ],
+  [
+   "n129.True",
+   "n134.execute"
+  ],
+  [
+   "n136.Armed",
+   "n135.Condition"
+  ],
+  [
+   "n134.True",
+   "n135.execute"
+  ],
+  [
+   "n135.True",
+   "n137.execute"
+  ],
+  [
+   "n139.self",
+   "n138.WorldContextObject"
+  ],
+  [
+   "n138.ReturnValue",
+   "n140.Object"
+  ],
+  [
+   "n137.then",
+   "n140.execute"
+  ],
+  [
+   "n140.as",
+   "n141.self"
+  ],
+  [
+   "n140.then",
+   "n141.execute"
+  ],
+  [
+   "n141.ReturnValue",
+   "n142.Condition"
+  ],
+  [
+   "n141.then",
+   "n142.execute"
+  ],
+  [
+   "n144.self",
+   "n143.self"
+  ],
+  [
+   "n142.False",
+   "n143.execute"
+  ],
+  [
+   "n147.self",
+   "n146.WorldContextObject"
+  ],
+  [
+   "n145.OtherActor",
+   "n148.A"
+  ],
+  [
+   "n146.ReturnValue",
+   "n148.B"
+  ],
+  [
+   "n148.ReturnValue",
+   "n149.Condition"
+  ],
+  [
+   "n145.then",
+   "n149.execute"
+  ],
+  [
+   "n151.self",
+   "n150.WorldContextObject"
+  ],
+  [
+   "n150.ReturnValue",
+   "n152.self"
+  ],
+  [
+   "n145.OtherComp",
+   "n153.A"
+  ],
+  [
+   "n152.ReturnValue",
+   "n153.B"
+  ],
+  [
+   "n153.ReturnValue",
+   "n154.Condition"
+  ],
+  [
+   "n149.True",
+   "n154.execute"
+  ],
+  [
+   "n145.OtherComp",
+   "n155.self"
+  ],
+  [
+   "n156.Target",
+   "n155.Other"
+  ],
+  [
+   "n155.ReturnValue",
+   "n157.Condition"
+  ],
+  [
+   "n154.True",
+   "n157.execute"
+  ],
+  [
+   "n157.False",
+   "n158.execute"
+  ],
+  [
+   "n159.TargetActor",
+   "n160.Target"
+  ],
+  [
+   "n159.then",
+   "n160.execute"
+  ],
+  [
+   "n160.then",
+   "n161.execute"
+  ],
+  [
+   "n163.self",
+   "n162.self"
+  ],
+  [
+   "n165.self",
+   "n164.self"
+  ],
+  [
+   "n162.then",
+   "n164.execute"
+  ],
+  [
+   "n167.Target",
+   "n166.Object"
+  ],
+  [
+   "n161.then",
+   "n166.execute"
+  ],
+  [
+   "n166.as",
+   "n169.self"
+  ],
+  [
+   "n168.OutputDelegate",
+   "n169.delegate"
+  ],
+  [
+   "n166.then",
+   "n169.execute"
+  ],
+  [
+   "n169.then",
+   "n162.execute"
+  ],
+  [
+   "n171.Target",
+   "n170.Object"
+  ],
+  [
+   "n166.CastFailed",
+   "n170.execute"
+  ],
+  [
+   "n170.as",
+   "n173.self"
+  ],
+  [
+   "n172.OutputDelegate",
+   "n173.delegate"
+  ],
+  [
+   "n170.then",
+   "n173.execute"
+  ],
+  [
+   "n173.then",
+   "n162.execute"
+  ],
+  [
+   "n175.Target",
+   "n174.Object"
+  ],
+  [
+   "n170.CastFailed",
+   "n174.execute"
+  ],
+  [
+   "n174.as",
+   "n177.self"
+  ],
+  [
+   "n176.OutputDelegate",
+   "n177.delegate"
+  ],
+  [
+   "n174.then",
+   "n177.execute"
+  ],
+  [
+   "n177.then",
+   "n162.execute"
+  ],
+  [
+   "n178.then",
+   "n179.execute"
+  ],
+  [
+   "n181.Target",
+   "n180.self"
+  ],
+  [
+   "n180.ReturnValue",
+   "n182.Array"
+  ],
+  [
+   "n179.then",
+   "n182.Exec"
+  ],
+  [
+   "n182.LoopBody",
+   "n183.execute"
+  ],
+  [
+   "n182.ArrayElement",
+   "n183.Object"
+  ],
+  [
+   "n183.as",
+   "n184.self"
+  ],
+  [
+   "n184.ReturnValue",
+   "n185.A"
+  ],
+  [
+   "n185.ReturnValue",
+   "n186.Condition"
+  ],
+  [
+   "n183.then",
+   "n186.execute"
+  ],
+  [
+   "n188.Touchable",
+   "n187.A"
+  ],
+  [
+   "n187.ReturnValue",
+   "n189.Touchable"
+  ],
+  [
+   "n186.True",
+   "n189.execute"
+  ],
+  [
+   "n191.Touchable",
+   "n190.A"
+  ],
+  [
+   "n190.ReturnValue",
+   "n192.Condition"
+  ],
+  [
+   "n182.Completed",
+   "n192.execute"
+  ],
+  [
+   "n192.True",
+   "n193.execute"
+  ],
+  [
+   "n192.False",
+   "n194.execute"
+  ],
+  [
+   "n197.Busy",
+   "n196.Condition"
+  ],
+  [
+   "n195.then",
+   "n196.execute"
+  ],
+  [
+   "n199.self",
+   "n198.WorldContextObject"
+  ],
+  [
+   "n198.ReturnValue",
+   "n200.Object"
+  ],
+  [
+   "n196.False",
+   "n200.execute"
+  ],
+  [
+   "n200.as",
+   "n201.self"
+  ],
+  [
+   "n200.then",
+   "n201.execute"
+  ],
+  [
+   "n201.ReturnValue",
+   "n202.Condition"
+  ],
+  [
+   "n201.then",
+   "n202.execute"
+  ],
+  [
+   "n202.False",
+   "n203.execute"
+  ],
+  [
+   "n195.GrippingController",
+   "n204.self"
+  ],
+  [
+   "n205.Target",
+   "n204.ObjectToDrop"
+  ],
+  [
+   "n203.then",
+   "n204.execute"
+  ],
+  [
+   "n207.self",
+   "n206.self"
+  ],
+  [
+   "n204.then",
+   "n206.execute"
+  ],
+  [
+   "n206.then",
+   "n208.execute"
+  ],
+  [
+   "n211.HasAtPos",
+   "n210.Condition"
+  ],
+  [
+   "n209.then",
+   "n210.execute"
+  ],
+  [
+   "n212.ReturnValue",
+   "n214.self"
+  ],
+  [
+   "n213.OutputDelegate",
+   "n214.delegate"
+  ],
+  [
+   "n210.True",
+   "n214.execute"
+  ],
+  [
+   "n212.ReturnValue",
+   "n216.self"
+  ],
+  [
+   "n215.OutputDelegate",
+   "n216.delegate"
+  ],
+  [
+   "n214.then",
+   "n216.execute"
+  ],
+  [
+   "n212.ReturnValue",
+   "n218.self"
+  ],
+  [
+   "n217.OutputDelegate",
+   "n218.delegate"
+  ],
+  [
+   "n216.then",
+   "n218.execute"
+  ],
+  [
+   "n220.self",
+   "n219.self"
+  ],
+  [
+   "n218.then",
+   "n219.execute"
+  ],
+  [
+   "n210.False",
+   "n219.execute"
+  ],
+  [
+   "n223.StreamName",
+   "n222.InString"
+  ],
+  [
+   "n225.self",
+   "n224.WorldContextObject"
+  ],
+  [
+   "n222.ReturnValue",
+   "n224.PackageName"
+  ],
+  [
+   "n224.ReturnValue",
+   "n226.Stream"
+  ],
+  [
+   "n227.Stream",
+   "n228.Object"
+  ],
+  [
+   "n228.ReturnValue",
+   "n229.Condition"
+  ],
+  [
+   "n221.then",
+   "n226.execute"
+  ],
+  [
+   "n226.then",
+   "n229.execute"
+  ],
+  [
+   "n230.Stream",
+   "n232.self"
+  ],
+  [
+   "n231.OutputDelegate",
+   "n232.delegate"
+  ],
+  [
+   "n229.True",
+   "n232.execute"
+  ],
+  [
+   "n234.Stream",
+   "n233.self"
+  ],
+  [
+   "n233.ReturnValue",
+   "n235.Condition"
+  ],
+  [
+   "n232.then",
+   "n235.execute"
+  ],
+  [
+   "n237.self",
+   "n236.self"
+  ],
+  [
+   "n235.True",
+   "n236.execute"
+  ],
+  [
+   "n240.Retrying",
+   "n239.A"
+  ],
+  [
+   "n239.ReturnValue",
+   "n238.Condition"
+  ],
+  [
+   "n229.False",
+   "n238.execute"
+  ],
+  [
+   "n238.True",
+   "n241.execute"
+  ],
+  [
+   "n242.ReturnValue",
+   "n244.self"
+  ],
+  [
+   "n243.OutputDelegate",
+   "n244.delegate"
+  ],
+  [
+   "n241.then",
+   "n244.execute"
+  ],
+  [
+   "n246.Stream",
+   "n247.Object"
+  ],
+  [
+   "n247.ReturnValue",
+   "n248.A"
+  ],
+  [
+   "n248.ReturnValue",
+   "n249.Condition"
+  ],
+  [
+   "n245.then",
+   "n249.execute"
+  ],
+  [
+   "n251.self",
+   "n250.self"
+  ],
+  [
+   "n249.True",
+   "n250.execute"
+  ],
+  [
+   "n253.Target",
+   "n254.Object"
+  ],
+  [
+   "n254.ReturnValue",
+   "n255.A"
+  ],
+  [
+   "n255.ReturnValue",
+   "n256.Condition"
+  ],
+  [
+   "n252.then",
+   "n256.execute"
+  ],
+  [
+   "n258.Stream",
+   "n257.self"
+  ],
+  [
+   "n257.ReturnValue",
+   "n259.Object"
+  ],
+  [
+   "n259.ReturnValue",
+   "n260.A"
+  ],
+  [
+   "n260.ReturnValue",
+   "n261.A"
+  ],
+  [
+   "n262.ObjectName",
+   "n261.B"
+  ],
+  [
+   "n264.self",
+   "n263.self"
+  ],
+  [
+   "n261.ReturnValue",
+   "n263.ObjPath"
+  ],
+  [
+   "n256.True",
+   "n263.execute"
+  ],
+  [
+   "n265.Found",
+   "n266.Object"
+  ],
+  [
+   "n266.ReturnValue",
+   "n267.Condition"
+  ],
+  [
+   "n263.then",
+   "n267.execute"
+  ],
+  [
+   "n268.Where",
+   "n269.B"
+  ],
+  [
+   "n269.ReturnValue",
+   "n270.A"
+  ],
+  [
+   "n270.ReturnValue",
+   "n271.Command"
+  ],
+  [
+   "n272.self",
+   "n271.WorldContextObject"
+  ],
+  [
+   "n267.False",
+   "n271.execute"
+  ],
+  [
+   "n274.Grab",
+   "n273.Condition"
+  ],
+  [
+   "n267.True",
+   "n273.execute"
+  ],
+  [
+   "n276.self",
+   "n275.self"
+  ],
+  [
+   "n277.Found",
+   "n275.TargetActor"
+  ],
+  [
+   "n273.False",
+   "n275.execute"
+  ],
+  [
+   "n279.self",
+   "n278.self"
+  ],
+  [
+   "n280.Found",
+   "n278.TargetActor"
+  ],
+  [
+   "n273.True",
+   "n278.execute"
+  ],
+  [
+   "n282.Result",
+   "n281.A"
+  ],
+  [
+   "n281.ReturnValue",
+   "n283.Condition"
+  ],
+  [
+   "n285.Result",
+   "n284.InInt"
+  ],
+  [
+   "n287.Where",
+   "n286.B"
+  ],
+  [
+   "n286.ReturnValue",
+   "n288.A"
+  ],
+  [
+   "n288.ReturnValue",
+   "n289.A"
+  ],
+  [
+   "n284.ReturnValue",
+   "n289.B"
+  ],
+  [
+   "n289.ReturnValue",
+   "n290.Command"
+  ],
+  [
+   "n291.self",
+   "n290.WorldContextObject"
+  ],
+  [
+   "n275.then",
+   "n290.execute"
+  ],
+  [
+   "n278.then",
+   "n290.execute"
+  ],
+  [
+   "n290.then",
+   "n283.execute"
+  ],
+  [
+   "n292.Where",
+   "n293.B"
+  ],
+  [
+   "n293.ReturnValue",
+   "n294.A"
+  ],
+  [
+   "n294.ReturnValue",
+   "n295.Command"
+  ],
+  [
+   "n296.self",
+   "n295.WorldContextObject"
+  ],
+  [
+   "n283.True",
+   "n295.execute"
+  ]
+ ],
+ "requires": [
+  "BP_ITRMapEntry.json"
+ ]
+}

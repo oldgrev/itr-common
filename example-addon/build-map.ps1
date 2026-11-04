@@ -46,6 +46,8 @@ Write-Host "Packed $($files.Count) files -> $Pak"
 
 if ($Install) {
     if (Get-Process "IntoTheRadius-Win64-Shipping" -ErrorAction SilentlyContinue) { throw "Close the game first (paks are mounted at startup)." }
-    Copy-Item $Pak (Join-Path $GameDir "IntoTheRadius\Content\Paks") -Force
-    Write-Host "Installed -> $GameDir\IntoTheRadius\Content\Paks\$PakName"
+    $Mods = Join-Path $GameDir "IntoTheRadius\Content\Paks\~mods"
+    New-Item -ItemType Directory -Force $Mods | Out-Null
+    Copy-Item $Pak $Mods -Force
+    Write-Host "Installed -> $Mods\$PakName"
 }

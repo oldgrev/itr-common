@@ -108,7 +108,14 @@ local function Check()
     end
 end
 
-local function Later() ExecuteInGameThread(function() pcall(Check) end) end
+-- Nothing queues before the mod is primed. UE4SS adds a mod to an unlocked list on its first ExecuteInGameThread, so that first call is an empty one made
+-- from the game thread outside any action: the game mode notification (the real BP_PRGameMode_C, not Default__). Until then Later does nothing; the
+-- retry below (every 10 s) and the first map load or AmmoConfig object after it do the write.
+local Primed = false
+local function Later()
+    if not Primed then return end
+    ExecuteInGameThread(function() pcall(Check) end)
+end
 
 -- Console command: bpen scale <x> | up | down | off. Writes the class defaults and every live bullet once.
 local function SetScale(X)
@@ -129,7 +136,15 @@ end
 
 -- DA_AmmoConfig may not exist yet (main menu). A new AmmoConfig object or a map load triggers the write; a read-back of one property every 10 s
 -- covers a reloaded asset that neither reports.
+pcall(NotifyOnNewObject, "/Script/IntoTheRadius.PRGameMode", function(Obj)
+    if Primed then return end
+    local Ok, Cls = pcall(function() return Obj:GetClass():GetFName():ToString() end)
+    local Okn, Nm = pcall(function() return Obj:GetFName():ToString() end)
+    if not (Ok and Cls == "BP_PRGameMode_C") or (Okn and Nm:sub(1, 9) == "Default__") then return end
+    Primed = true
+    ExecuteInGameThread(function() end)
+    Later()                                  -- the write that used to happen at mod start
+end)
 pcall(NotifyOnNewObject, "/Script/IntoTheRadius.AmmoConfig", Later)
 if type(RegisterLoadMapPostHook) == "function" then pcall(RegisterLoadMapPostHook, Later) end
 LoopAsync(10000, function() Later() return false end)
-Later()

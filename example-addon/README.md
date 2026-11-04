@@ -1,6 +1,9 @@
 # Example level add-on: a room on a Hub roof
 
-A small add-on for the Hub of Into the Radius 1 (2.7.2), loaded by [`../addons-ue4ss`](../addons-ue4ss/) (ITRLevelAddons):
+This example adds a room and a ladder to a roof in the Hub of Into the Radius 1 (2.7.2).
+[`ITRLevelAddons`](../addons-ue4ss/) loads it within the existing Hub.
+
+Here's what the add-on contains:
 
 - a Hub container room (the stock container shell `SM_Industrial_Container_Hub_Room_01_a`, the room interior
   `SM_Hub_Room_Interior_01_a` and a window `SM_Hub_Room_Window_01_b`, put together the way the Hub's rooms are) standing
@@ -23,21 +26,27 @@ Everything is placed in Hub world coordinates and streamed in at the origin.
 | Ladder foot (pivot), pitch 7, yaw 90, scale Z 0.8854 | (-34150, -678, 85); top at z 394, 54 cm above the roof |
 | Roof strip you land on | X -34283 .. -33826, Y -877 .. -707, z 340 |
 
-Why there: the Hub's housing units are containers. The candidates were the player's shelter (its roof already has
-handrails, a stair and the tutorial ladder, so it is reachable), the two-high container stack next to the shelter (a
-catwalk and stairs lead onto it), the third container on the stack at the other side of the shelter (235 cm wide,
-narrower than the room), the container piles in the yard (junk heaps, no flat roof) and the factory hall roof (21 m up). The Hub room
-`SM_ContainerClosed_33` is a housing unit with a flat roof at 3.4 m, nothing on it but a pallet, nothing above it up to the
-hall's windows at 7 m, and free floor (the hall's floor slab at z 85) along its +Y wall for the ladder.
+Why this roof? `SM_ContainerClosed_33` has a flat roof at 3.4 m with just a pallet on it. There's clear space above it
+up to the hall's windows at 7 m, and the hall's floor slab at z 85 leaves room for a ladder along the +Y wall.
+
+We considered a few other spots among the Hub's container housing:
+
+- The player's shelter already has handrails, stairs and the tutorial ladder, so its roof is reachable.
+- The two-high stack next to the shelter already has a catwalk and stairs.
+- The third container on the stack on the other side of the shelter is only 235 cm wide, narrower than the room.
+- The yard's container piles are junk heaps without a flat roof.
+- The factory hall roof is 21 m up.
 
 ## Lighting
-All add-on meshes are Movable (the rule for add-ons, see the [mod README](../addons-ue4ss/README.md#building-an-add-on)).
+
+Set every add-on mesh to Movable, as explained in the [mod README](../addons-ue4ss/README.md#building-an-add-on).
 They are lit by the Hub's volumetric lightmap at that spot and by the Hub's stationary lights, with dynamic shadows. The
 volumetric lightmap there was baked with open air in place of the room, so the inside of the room is lit about as
-brightly as the yard around it, evenly, with no darker corners. It is readable without a lamp; a Movable point light
-inside (warm, low intensity, small radius) is what would make it look lived in.
+brightly as the yard around it, evenly, with no darker corners. You can see inside without a lamp. If you want it to feel more lived in, try a warm Movable point light
+with low intensity and a small radius.
 
 ## Building it
+
 You need the special editor from the [map-making guide](../map-making/guide.md) (or stock 4.27: the add-on has no
 new material), Python 3 and a copy of the game.
 
@@ -50,13 +59,16 @@ new material), Python 3 and a copy of the game.
    ```powershell
    python Scripts\export_hub.py --cue4export <path>\cue4export.exe --engine "C:\ue427\Engine"
    ```
-   It unpacks only the Hub levels, the Blueprints placed in them and the folders of the meshes they use (with the
-   engine's UnrealPak, about 5 GB into `build\hubref\unpacked`, which you can delete afterwards), lists every placed mesh
-   with its world transform (about 2700) and writes each mesh as an FBX (about 570, 250 MB).
+   This uses the engine's UnrealPak to unpack the Hub levels, their placed Blueprints and the mesh folders they use.
+   Allow about 5 GB for `build\hubref\unpacked`; you can delete that folder afterwards.
+
+   The exporter lists about 2700 placed meshes with their positions, rotations and scales, then writes about 570
+   mesh FBX files (250 MB).
    It uses cue4export, a small command-line exporter built on CUE4Parse (`level` and `mesh` commands); it isn't
    in this repo yet. If you already have the game unpacked, pass `--game-content <unpacked>\IntoTheRadius\Content` instead
    of `--engine`.
-4. Build the stand-ins and the Hub reference, then the add-on (in the editor with File, Execute Python Script, or headless):
+4. Build the stand-ins and the Hub reference, then the add-on. You can run the scripts through File > Execute Python
+   Script in the editor, or use these commands without opening an editor window:
    ```bat
    C:\ue427\Engine\Binaries\Win64\UE4Editor-Cmd.exe <path>\IntoTheRadius.uproject -run=pythonscript -script=<path>\Scripts\import_hub.py -nullrhi -unattended
    C:\ue427\Engine\Binaries\Win64\UE4Editor-Cmd.exe <path>\IntoTheRadius.uproject -run=pythonscript -script=<path>\Scripts\build_addon.py -nullrhi -unattended
@@ -69,7 +81,7 @@ new material), Python 3 and a copy of the game.
    ```powershell
    .\build-map.ps1 -Engine "C:\ue427\Engine" -Install
    ```
-   This packs only `/Game/Mods/HubCozyCorner` into `zzz_ITRAddon_HubCozyCorner_P.pak`. The stand-ins get cooked too (the
+   `-Install` copies the pak into `<game>\IntoTheRadius\Content\Paks\~mods\`. This packs only `/Game/Mods/HubCozyCorner` into `zzz_ITRAddon_HubCozyCorner_P.pak`. The stand-ins get cooked too (the
    level uses them) but stay out of the pak, and the Hub reference is never cooked: the game loads its real meshes.
 6. Install the mod ([`../addons-ue4ss`](../addons-ue4ss/)) and copy [`addon/HubCozyCorner.json`](addon/HubCozyCorner.json)
    into its `Addons` folder.
@@ -78,15 +90,17 @@ new material), Python 3 and a copy of the game.
 `.gitignore`; don't publish them or a copy of them.
 
 ## Placing things by hand
+
 1. Open `IntoTheRadius.uproject`, then the level `Content/Mods/HubCozyCorner/L_HubCozyCornerHost`.
-2. Window, Levels: you see `L_HubCozyCorner` (the add-on) and `L_HubReference` (the Hub). Double-click
+2. Open Window > Levels. You'll see `L_HubCozyCorner` (the add-on) and `L_HubReference` (the Hub). Double-click
    `L_HubCozyCorner` to make it the current level (new actors go there), and click the padlock next to `L_HubReference`
    so the Hub can't be moved by accident. The eye icon hides the reference when you want to look at the add-on alone.
 3. The Hub shows as grey grid meshes at their cooked positions, with their collision. In the World Outliner they are in
    folders per Hub level (`L_Hub/StaticMeshActor`, `L_Hub_factory/...`), labelled with the Hub actor's name: click a Hub
    mesh and its label is the name a `hide` entry takes (a label like `Actor.Component` is one part of a bigger Hub actor;
    use the part before the dot).
-4. Exact coordinates: the add-on is streamed in at the origin, so the Location in Details is the Hub world position.
+4. To copy an exact position, use Location in the Details panel. The add-on is streamed in at the origin, so these
+   values are already Hub world coordinates.
    Click a Hub mesh to read its position, right-click the Location field, Copy, and Paste it on your actor.
 5. Snapping:
    - **Surface snapping** (the curved-arrow toggle in the viewport toolbar, next to the grid snap): dragging an actor
@@ -103,15 +117,17 @@ new material), Python 3 and a copy of the game.
    ```powershell
    .\build-map.ps1 -Engine "C:\ue427\Engine" -Install
    ```
-   Then start the game. A rerun of `build_addon.py` puts the example's actors back where the script has them; to keep
-   your changes, don't rerun it (or remove the `addon_example` tag from the actors you moved).
+   Then start the game. One easy trap: running `build_addon.py` again resets the example actors to their scripted
+   positions. To keep your edits, leave that script alone or remove the `addon_example` tag from actors you moved.
 
 ## Making your own add-on
+
 Copy the folder, change `NAME` in `Scripts/build_addon.py` (and its contents), pass `-Map <Name>` to `build-map.ps1`,
 and write a manifest `addon/<Name>.json` with `"level": "/Game/Mods/<Name>/L_<Name>"`. The manifest fields are in the
 [mod README](../addons-ue4ss/README.md#the-manifest).
 
 ## What was tested (October 2026)
+
 - Steps 2 to 5 with the special editor, headless: `export_hub.py` through UnrealPak (6 minutes, 2724 placed meshes, 566
   meshes exported, none failed), `import_hub.py` (566 stand-ins, every one within 1 % of the game mesh's bounds, and 2640
   reference actors, in about 3 minutes), `build_addon.py` and `build-map.ps1` (a 9.5 KB pak with the level only; its

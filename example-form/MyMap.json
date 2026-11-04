@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "name": "MyMap",
+  "displayName": "My Map",
+  "description": "One line for the list",
+  "level": "/Game/Mods/MyMap/L_MyMap",
+  "start": { "x": -3000, "y": -600000, "z": 20, "yaw": 0 },
+  "returnpointstoragepath": "MyMap_returnpoint",
+  "noprepend": true,
+  "triggers": [
+    { "kind": "regions" },
+    { "kind": "level", "target": "/Game/ITR/Levels/Hub/L_Hub", "level": "/Game/Mods/MyMapHub/L_MyMapHub", "type": "collision", "object": "myfield1" },
+    { "kind": "level", "target": "/Game/ITR/Levels/Hub/L_Hub", "level": "/Game/Mods/MyMapHub/L_MyMapHub", "type": "grab", "object": "mydoorhandle1" },
+    { "kind": "exit", "type": "collision", "object": "myexitfield1" }
+  ]
+}

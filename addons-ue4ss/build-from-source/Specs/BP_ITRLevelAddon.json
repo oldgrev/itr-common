@@ -1,0 +1,1368 @@
+{
+ "once": false,
+ "_doc": "ITRLevelAddons: one add-on level. Start makes its streaming entry (switched off) and listens to the target level; while the target is shown the add-on is switched on, while it is hidden, off; the stock actors named in Hides are hidden when the add-on is shown. Report is read by Lua after Start. No Tick, no timer, no console command.",
+ "asset": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon",
+ "parent": "/Script/Engine.Actor",
+ "components": [],
+ "variables": [
+  {
+   "name": "AddonName",
+   "type": "string",
+   "default": ""
+  },
+  {
+   "name": "LevelPath",
+   "type": "string",
+   "default": ""
+  },
+  {
+   "name": "TargetName",
+   "type": "string",
+   "default": ""
+  },
+  {
+   "name": "Hides",
+   "type": "string",
+   "default": ""
+  },
+  {
+   "name": "Loc",
+   "type": "vector",
+   "default": "0,0,0"
+  },
+  {
+   "name": "Rot",
+   "type": "rotator"
+  },
+  {
+   "name": "Scale",
+   "type": "vector",
+   "default": "1,1,1"
+  },
+  {
+   "name": "HideLevels",
+   "type": "string",
+   "default": ""
+  },
+  {
+   "name": "Matched",
+   "type": "bool",
+   "default": "false"
+  },
+  {
+   "name": "HideWarned",
+   "type": "bool",
+   "default": "false"
+  },
+  {
+   "name": "Report",
+   "type": "string",
+   "default": ""
+  },
+  {
+   "name": "Retrying",
+   "type": "bool",
+   "default": "false"
+  },
+  {
+   "name": "Inst",
+   "type": "object:/Script/Engine.LevelStreamingDynamic"
+  },
+  {
+   "name": "Target",
+   "type": "object:/Script/Engine.LevelStreaming"
+  }
+ ],
+ "cdo": {
+  "PrimaryActorTick": "(bCanEverTick=False)"
+ },
+ "nodes": [
+  {
+   "id": "n1",
+   "op": "custom_event",
+   "name": "Start"
+  },
+  {
+   "id": "n2",
+   "op": "call",
+   "function": "KismetStringLibrary:Conv_StringToName"
+  },
+  {
+   "id": "n3",
+   "op": "call",
+   "function": "LevelStreamingDynamic:LoadLevelInstance"
+  },
+  {
+   "id": "n4",
+   "op": "get",
+   "var": "Loc"
+  },
+  {
+   "id": "n5",
+   "op": "get",
+   "var": "Rot"
+  },
+  {
+   "id": "n6",
+   "op": "self"
+  },
+  {
+   "id": "n7",
+   "op": "get",
+   "var": "LevelPath"
+  },
+  {
+   "id": "n8",
+   "op": "get",
+   "var": "AddonName"
+  },
+  {
+   "id": "n9",
+   "op": "set",
+   "var": "Inst"
+  },
+  {
+   "id": "n10",
+   "op": "branch"
+  },
+  {
+   "id": "n11",
+   "op": "call",
+   "function": "KismetMathLibrary:MakeTransform"
+  },
+  {
+   "id": "n12",
+   "op": "get",
+   "var": "Loc"
+  },
+  {
+   "id": "n13",
+   "op": "get",
+   "var": "Rot"
+  },
+  {
+   "id": "n14",
+   "op": "get",
+   "var": "Scale"
+  },
+  {
+   "id": "n15",
+   "op": "set",
+   "var": "LevelTransform",
+   "class": "/Script/Engine.LevelStreaming"
+  },
+  {
+   "id": "n16",
+   "op": "get",
+   "var": "Inst"
+  },
+  {
+   "id": "n17",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "level could not be loaded: "
+   }
+  },
+  {
+   "id": "n18",
+   "op": "get",
+   "var": "LevelPath"
+  },
+  {
+   "id": "n19",
+   "op": "set",
+   "var": "Report"
+  },
+  {
+   "id": "n20",
+   "op": "get",
+   "var": "Inst"
+  },
+  {
+   "id": "n21",
+   "op": "call",
+   "function": "LevelStreaming:SetShouldBeLoaded",
+   "pins": {
+    "bInShouldBeLoaded": false
+   }
+  },
+  {
+   "id": "n22",
+   "op": "call",
+   "function": "LevelStreaming:SetShouldBeVisible",
+   "pins": {
+    "bInShouldBeVisible": false
+   }
+  },
+  {
+   "id": "n23",
+   "op": "get",
+   "var": "Inst"
+  },
+  {
+   "id": "n24",
+   "op": "create_delegate",
+   "function": "HAddonShown"
+  },
+  {
+   "id": "n25",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/Engine.LevelStreaming',MemberName=\"OnLevelShown\")"
+   }
+  },
+  {
+   "id": "n26",
+   "op": "call",
+   "function": "BindHides"
+  },
+  {
+   "id": "n27",
+   "op": "self"
+  },
+  {
+   "id": "n28",
+   "op": "call",
+   "function": "BindTarget"
+  },
+  {
+   "id": "n29",
+   "op": "self"
+  },
+  {
+   "id": "n30",
+   "op": "custom_event",
+   "name": "BindHides"
+  },
+  {
+   "id": "n31",
+   "op": "call",
+   "function": "KismetStringLibrary:ParseIntoArray",
+   "pins": {
+    "Delimiter": ",",
+    "CullEmptyStrings": true
+   }
+  },
+  {
+   "id": "n32",
+   "op": "get",
+   "var": "HideLevels"
+  },
+  {
+   "id": "n33",
+   "op": "macro",
+   "macro": "ForEachLoop"
+  },
+  {
+   "id": "n34",
+   "op": "call",
+   "function": "BindHide"
+  },
+  {
+   "id": "n35",
+   "op": "self"
+  },
+  {
+   "id": "n36",
+   "op": "custom_event",
+   "name": "BindHide",
+   "params": [
+    {
+     "name": "Nm",
+     "type": "string"
+    }
+   ]
+  },
+  {
+   "id": "n37",
+   "op": "call",
+   "function": "KismetStringLibrary:Conv_StringToName"
+  },
+  {
+   "id": "n38",
+   "op": "call",
+   "function": "GameplayStatics:GetStreamingLevel"
+  },
+  {
+   "id": "n39",
+   "op": "self"
+  },
+  {
+   "id": "n40",
+   "op": "call",
+   "function": "KismetSystemLibrary:IsValid"
+  },
+  {
+   "id": "n41",
+   "op": "branch"
+  },
+  {
+   "id": "n42",
+   "op": "create_delegate",
+   "function": "HAddonShown"
+  },
+  {
+   "id": "n43",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/Engine.LevelStreaming',MemberName=\"OnLevelShown\")"
+   }
+  },
+  {
+   "id": "n44",
+   "op": "custom_event",
+   "name": "BindTarget"
+  },
+  {
+   "id": "n45",
+   "op": "get",
+   "var": "TargetName"
+  },
+  {
+   "id": "n46",
+   "op": "call",
+   "function": "KismetStringLibrary:Conv_StringToName"
+  },
+  {
+   "id": "n47",
+   "op": "call",
+   "function": "GameplayStatics:GetStreamingLevel"
+  },
+  {
+   "id": "n48",
+   "op": "self"
+  },
+  {
+   "id": "n49",
+   "op": "set",
+   "var": "Target"
+  },
+  {
+   "id": "n50",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n51",
+   "op": "call",
+   "function": "KismetSystemLibrary:IsValid"
+  },
+  {
+   "id": "n52",
+   "op": "branch"
+  },
+  {
+   "id": "n53",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n54",
+   "op": "create_delegate",
+   "function": "HTargetShown"
+  },
+  {
+   "id": "n55",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/Engine.LevelStreaming',MemberName=\"OnLevelShown\")"
+   }
+  },
+  {
+   "id": "n56",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n57",
+   "op": "create_delegate",
+   "function": "HTargetHidden"
+  },
+  {
+   "id": "n58",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/Engine.LevelStreaming',MemberName=\"OnLevelHidden\")"
+   }
+  },
+  {
+   "id": "n59",
+   "op": "call",
+   "function": "LevelStreaming:IsLevelVisible"
+  },
+  {
+   "id": "n60",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n61",
+   "op": "branch"
+  },
+  {
+   "id": "n62",
+   "op": "call",
+   "function": "HTargetShown"
+  },
+  {
+   "id": "n63",
+   "op": "self"
+  },
+  {
+   "id": "n64",
+   "op": "branch"
+  },
+  {
+   "id": "n65",
+   "op": "call",
+   "function": "KismetMathLibrary:Not_PreBool"
+  },
+  {
+   "id": "n66",
+   "op": "get",
+   "var": "Retrying"
+  },
+  {
+   "id": "n67",
+   "op": "set",
+   "var": "Retrying",
+   "pins": {
+    "Retrying": true
+   }
+  },
+  {
+   "id": "n68",
+   "op": "call",
+   "function": "EventsManager:GetEventsManager"
+  },
+  {
+   "id": "n69",
+   "op": "create_delegate",
+   "function": "HRetry"
+  },
+  {
+   "id": "n70",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/IntoTheRadius.EventsManager',MemberName=\"OnLevelStarted\")"
+   }
+  },
+  {
+   "id": "n71",
+   "op": "custom_event",
+   "name": "HRetry",
+   "params": [
+    {
+     "name": "Value",
+     "type": "struct:GameplayTag"
+    }
+   ]
+  },
+  {
+   "id": "n72",
+   "op": "get",
+   "var": "Target"
+  },
+  {
+   "id": "n73",
+   "op": "call",
+   "function": "KismetSystemLibrary:IsValid"
+  },
+  {
+   "id": "n74",
+   "op": "call",
+   "function": "KismetMathLibrary:Not_PreBool"
+  },
+  {
+   "id": "n75",
+   "op": "branch"
+  },
+  {
+   "id": "n76",
+   "op": "call",
+   "function": "BindTarget"
+  },
+  {
+   "id": "n77",
+   "op": "self"
+  },
+  {
+   "id": "n78",
+   "op": "custom_event",
+   "name": "HTargetShown"
+  },
+  {
+   "id": "n79",
+   "op": "get",
+   "var": "Inst"
+  },
+  {
+   "id": "n80",
+   "op": "call",
+   "function": "KismetSystemLibrary:IsValid"
+  },
+  {
+   "id": "n81",
+   "op": "branch"
+  },
+  {
+   "id": "n82",
+   "op": "get",
+   "var": "Inst"
+  },
+  {
+   "id": "n83",
+   "op": "call",
+   "function": "LevelStreaming:SetShouldBeLoaded",
+   "pins": {
+    "bInShouldBeLoaded": true
+   }
+  },
+  {
+   "id": "n84",
+   "op": "call",
+   "function": "LevelStreaming:SetShouldBeVisible",
+   "pins": {
+    "bInShouldBeVisible": true
+   }
+  },
+  {
+   "id": "n85",
+   "op": "custom_event",
+   "name": "HTargetHidden"
+  },
+  {
+   "id": "n86",
+   "op": "get",
+   "var": "Inst"
+  },
+  {
+   "id": "n87",
+   "op": "call",
+   "function": "KismetSystemLibrary:IsValid"
+  },
+  {
+   "id": "n88",
+   "op": "branch"
+  },
+  {
+   "id": "n89",
+   "op": "get",
+   "var": "Inst"
+  },
+  {
+   "id": "n90",
+   "op": "call",
+   "function": "LevelStreaming:SetShouldBeLoaded",
+   "pins": {
+    "bInShouldBeLoaded": false
+   }
+  },
+  {
+   "id": "n91",
+   "op": "call",
+   "function": "LevelStreaming:SetShouldBeVisible",
+   "pins": {
+    "bInShouldBeVisible": false
+   }
+  },
+  {
+   "id": "n92",
+   "op": "custom_event",
+   "name": "HAddonShown"
+  },
+  {
+   "id": "n93",
+   "op": "call",
+   "function": "KismetStringLibrary:ParseIntoArray",
+   "pins": {
+    "Delimiter": ",",
+    "CullEmptyStrings": true
+   }
+  },
+  {
+   "id": "n94",
+   "op": "get",
+   "var": "Hides"
+  },
+  {
+   "id": "n95",
+   "op": "macro",
+   "macro": "ForEachLoop"
+  },
+  {
+   "id": "n96",
+   "op": "call",
+   "function": "HideOne"
+  },
+  {
+   "id": "n97",
+   "op": "self"
+  },
+  {
+   "id": "n98",
+   "op": "custom_event",
+   "name": "HideOne",
+   "params": [
+    {
+     "name": "Nm",
+     "type": "string"
+    }
+   ]
+  },
+  {
+   "id": "n99",
+   "op": "call",
+   "function": "GameplayStatics:GetAllActorsOfClass",
+   "pins": {
+    "ActorClass": "/Script/Engine.Actor"
+   }
+  },
+  {
+   "id": "n100",
+   "op": "self"
+  },
+  {
+   "id": "n101",
+   "op": "macro",
+   "macro": "ForEachLoop"
+  },
+  {
+   "id": "n102",
+   "op": "set",
+   "var": "Matched",
+   "pins": {
+    "Matched": false
+   }
+  },
+  {
+   "id": "n103",
+   "op": "call",
+   "function": "KismetSystemLibrary:GetPathName"
+  },
+  {
+   "id": "n104",
+   "op": "call",
+   "function": "KismetStringLibrary:EndsWith"
+  },
+  {
+   "id": "n105",
+   "op": "branch"
+  },
+  {
+   "id": "n106",
+   "op": "call",
+   "function": "Actor:SetActorHiddenInGame",
+   "pins": {
+    "bNewHidden": true
+   }
+  },
+  {
+   "id": "n107",
+   "op": "call",
+   "function": "Actor:SetActorEnableCollision",
+   "pins": {
+    "bNewActorEnableCollision": false
+   }
+  },
+  {
+   "id": "n108",
+   "op": "set",
+   "var": "Matched",
+   "pins": {
+    "Matched": true
+   }
+  },
+  {
+   "id": "n109",
+   "op": "call",
+   "function": "KismetStringLibrary:FindSubstring",
+   "pins": {
+    "Substring": ":"
+   }
+  },
+  {
+   "id": "n110",
+   "op": "call",
+   "function": "KismetStringLibrary:Left"
+  },
+  {
+   "id": "n111",
+   "op": "call",
+   "function": "KismetStringLibrary:Conv_StringToName"
+  },
+  {
+   "id": "n112",
+   "op": "call",
+   "function": "GameplayStatics:GetStreamingLevel"
+  },
+  {
+   "id": "n113",
+   "op": "self"
+  },
+  {
+   "id": "n114",
+   "op": "call",
+   "function": "KismetSystemLibrary:IsValid"
+  },
+  {
+   "id": "n115",
+   "op": "call",
+   "function": "LevelStreaming:IsLevelVisible"
+  },
+  {
+   "id": "n116",
+   "op": "call",
+   "function": "KismetMathLibrary:Not_PreBool"
+  },
+  {
+   "id": "n117",
+   "op": "get",
+   "var": "Matched"
+  },
+  {
+   "id": "n118",
+   "op": "call",
+   "function": "KismetMathLibrary:Not_PreBool"
+  },
+  {
+   "id": "n119",
+   "op": "get",
+   "var": "HideWarned"
+  },
+  {
+   "id": "n120",
+   "op": "call",
+   "function": "KismetMathLibrary:BooleanAND"
+  },
+  {
+   "id": "n121",
+   "op": "call",
+   "function": "KismetMathLibrary:BooleanAND"
+  },
+  {
+   "id": "n122",
+   "op": "call",
+   "function": "KismetMathLibrary:BooleanAND"
+  },
+  {
+   "id": "n123",
+   "op": "branch"
+  },
+  {
+   "id": "n124",
+   "op": "set",
+   "var": "HideWarned",
+   "pins": {
+    "HideWarned": true
+   }
+  },
+  {
+   "id": "n125",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "itraddons log add-on "
+   }
+  },
+  {
+   "id": "n126",
+   "op": "get",
+   "var": "AddonName"
+  },
+  {
+   "id": "n127",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "B": ": hide "
+   }
+  },
+  {
+   "id": "n128",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr"
+  },
+  {
+   "id": "n129",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "B": " matches no actor of its level"
+   }
+  },
+  {
+   "id": "n130",
+   "op": "call",
+   "function": "KismetSystemLibrary:ExecuteConsoleCommand"
+  },
+  {
+   "id": "n131",
+   "op": "self"
+  }
+ ],
+ "links": [
+  [
+   "n4.Loc",
+   "n3.Location"
+  ],
+  [
+   "n5.Rot",
+   "n3.Rotation"
+  ],
+  [
+   "n6.self",
+   "n3.WorldContextObject"
+  ],
+  [
+   "n7.LevelPath",
+   "n3.LevelName"
+  ],
+  [
+   "n8.AddonName",
+   "n3.OptionalLevelNameOverride"
+  ],
+  [
+   "n3.ReturnValue",
+   "n9.Inst"
+  ],
+  [
+   "n3.bOutSuccess",
+   "n10.Condition"
+  ],
+  [
+   "n1.then",
+   "n3.execute"
+  ],
+  [
+   "n3.then",
+   "n9.execute"
+  ],
+  [
+   "n12.Loc",
+   "n11.Location"
+  ],
+  [
+   "n13.Rot",
+   "n11.Rotation"
+  ],
+  [
+   "n14.Scale",
+   "n11.Scale"
+  ],
+  [
+   "n16.Inst",
+   "n15.self"
+  ],
+  [
+   "n11.ReturnValue",
+   "n15.LevelTransform"
+  ],
+  [
+   "n9.then",
+   "n15.execute"
+  ],
+  [
+   "n15.then",
+   "n10.execute"
+  ],
+  [
+   "n18.LevelPath",
+   "n17.B"
+  ],
+  [
+   "n17.ReturnValue",
+   "n19.Report"
+  ],
+  [
+   "n10.False",
+   "n19.execute"
+  ],
+  [
+   "n20.Inst",
+   "n21.self"
+  ],
+  [
+   "n20.Inst",
+   "n22.self"
+  ],
+  [
+   "n21.then",
+   "n22.execute"
+  ],
+  [
+   "n10.True",
+   "n21.execute"
+  ],
+  [
+   "n23.Inst",
+   "n25.self"
+  ],
+  [
+   "n24.OutputDelegate",
+   "n25.delegate"
+  ],
+  [
+   "n22.then",
+   "n25.execute"
+  ],
+  [
+   "n27.self",
+   "n26.self"
+  ],
+  [
+   "n25.then",
+   "n26.execute"
+  ],
+  [
+   "n29.self",
+   "n28.self"
+  ],
+  [
+   "n26.then",
+   "n28.execute"
+  ],
+  [
+   "n32.HideLevels",
+   "n31.SourceString"
+  ],
+  [
+   "n31.ReturnValue",
+   "n33.Array"
+  ],
+  [
+   "n30.then",
+   "n33.Exec"
+  ],
+  [
+   "n35.self",
+   "n34.self"
+  ],
+  [
+   "n33.ArrayElement",
+   "n34.Nm"
+  ],
+  [
+   "n33.LoopBody",
+   "n34.execute"
+  ],
+  [
+   "n36.Nm",
+   "n37.InString"
+  ],
+  [
+   "n39.self",
+   "n38.WorldContextObject"
+  ],
+  [
+   "n37.ReturnValue",
+   "n38.PackageName"
+  ],
+  [
+   "n38.ReturnValue",
+   "n40.Object"
+  ],
+  [
+   "n40.ReturnValue",
+   "n41.Condition"
+  ],
+  [
+   "n36.then",
+   "n41.execute"
+  ],
+  [
+   "n38.ReturnValue",
+   "n43.self"
+  ],
+  [
+   "n42.OutputDelegate",
+   "n43.delegate"
+  ],
+  [
+   "n41.True",
+   "n43.execute"
+  ],
+  [
+   "n45.TargetName",
+   "n46.InString"
+  ],
+  [
+   "n48.self",
+   "n47.WorldContextObject"
+  ],
+  [
+   "n46.ReturnValue",
+   "n47.PackageName"
+  ],
+  [
+   "n47.ReturnValue",
+   "n49.Target"
+  ],
+  [
+   "n50.Target",
+   "n51.Object"
+  ],
+  [
+   "n51.ReturnValue",
+   "n52.Condition"
+  ],
+  [
+   "n44.then",
+   "n49.execute"
+  ],
+  [
+   "n49.then",
+   "n52.execute"
+  ],
+  [
+   "n53.Target",
+   "n55.self"
+  ],
+  [
+   "n54.OutputDelegate",
+   "n55.delegate"
+  ],
+  [
+   "n52.True",
+   "n55.execute"
+  ],
+  [
+   "n56.Target",
+   "n58.self"
+  ],
+  [
+   "n57.OutputDelegate",
+   "n58.delegate"
+  ],
+  [
+   "n55.then",
+   "n58.execute"
+  ],
+  [
+   "n60.Target",
+   "n59.self"
+  ],
+  [
+   "n59.ReturnValue",
+   "n61.Condition"
+  ],
+  [
+   "n58.then",
+   "n61.execute"
+  ],
+  [
+   "n63.self",
+   "n62.self"
+  ],
+  [
+   "n61.True",
+   "n62.execute"
+  ],
+  [
+   "n66.Retrying",
+   "n65.A"
+  ],
+  [
+   "n65.ReturnValue",
+   "n64.Condition"
+  ],
+  [
+   "n52.False",
+   "n64.execute"
+  ],
+  [
+   "n64.True",
+   "n67.execute"
+  ],
+  [
+   "n68.ReturnValue",
+   "n70.self"
+  ],
+  [
+   "n69.OutputDelegate",
+   "n70.delegate"
+  ],
+  [
+   "n67.then",
+   "n70.execute"
+  ],
+  [
+   "n72.Target",
+   "n73.Object"
+  ],
+  [
+   "n73.ReturnValue",
+   "n74.A"
+  ],
+  [
+   "n74.ReturnValue",
+   "n75.Condition"
+  ],
+  [
+   "n71.then",
+   "n75.execute"
+  ],
+  [
+   "n77.self",
+   "n76.self"
+  ],
+  [
+   "n75.True",
+   "n76.execute"
+  ],
+  [
+   "n79.Inst",
+   "n80.Object"
+  ],
+  [
+   "n80.ReturnValue",
+   "n81.Condition"
+  ],
+  [
+   "n78.then",
+   "n81.execute"
+  ],
+  [
+   "n82.Inst",
+   "n83.self"
+  ],
+  [
+   "n82.Inst",
+   "n84.self"
+  ],
+  [
+   "n83.then",
+   "n84.execute"
+  ],
+  [
+   "n81.True",
+   "n83.execute"
+  ],
+  [
+   "n86.Inst",
+   "n87.Object"
+  ],
+  [
+   "n87.ReturnValue",
+   "n88.Condition"
+  ],
+  [
+   "n85.then",
+   "n88.execute"
+  ],
+  [
+   "n89.Inst",
+   "n90.self"
+  ],
+  [
+   "n89.Inst",
+   "n91.self"
+  ],
+  [
+   "n90.then",
+   "n91.execute"
+  ],
+  [
+   "n88.True",
+   "n90.execute"
+  ],
+  [
+   "n94.Hides",
+   "n93.SourceString"
+  ],
+  [
+   "n93.ReturnValue",
+   "n95.Array"
+  ],
+  [
+   "n92.then",
+   "n95.Exec"
+  ],
+  [
+   "n97.self",
+   "n96.self"
+  ],
+  [
+   "n95.ArrayElement",
+   "n96.Nm"
+  ],
+  [
+   "n95.LoopBody",
+   "n96.execute"
+  ],
+  [
+   "n100.self",
+   "n99.WorldContextObject"
+  ],
+  [
+   "n99.OutActors",
+   "n101.Array"
+  ],
+  [
+   "n98.then",
+   "n102.execute"
+  ],
+  [
+   "n102.then",
+   "n99.execute"
+  ],
+  [
+   "n99.then",
+   "n101.Exec"
+  ],
+  [
+   "n101.ArrayElement",
+   "n103.Object"
+  ],
+  [
+   "n103.ReturnValue",
+   "n104.SourceString"
+  ],
+  [
+   "n98.Nm",
+   "n104.InSuffix"
+  ],
+  [
+   "n104.ReturnValue",
+   "n105.Condition"
+  ],
+  [
+   "n101.LoopBody",
+   "n105.execute"
+  ],
+  [
+   "n101.ArrayElement",
+   "n106.self"
+  ],
+  [
+   "n105.True",
+   "n106.execute"
+  ],
+  [
+   "n101.ArrayElement",
+   "n107.self"
+  ],
+  [
+   "n106.then",
+   "n107.execute"
+  ],
+  [
+   "n107.then",
+   "n108.execute"
+  ],
+  [
+   "n98.Nm",
+   "n109.SearchIn"
+  ],
+  [
+   "n98.Nm",
+   "n110.SourceString"
+  ],
+  [
+   "n109.ReturnValue",
+   "n110.Count"
+  ],
+  [
+   "n110.ReturnValue",
+   "n111.InString"
+  ],
+  [
+   "n113.self",
+   "n112.WorldContextObject"
+  ],
+  [
+   "n111.ReturnValue",
+   "n112.PackageName"
+  ],
+  [
+   "n112.ReturnValue",
+   "n114.Object"
+  ],
+  [
+   "n112.ReturnValue",
+   "n115.self"
+  ],
+  [
+   "n117.Matched",
+   "n116.A"
+  ],
+  [
+   "n119.HideWarned",
+   "n118.A"
+  ],
+  [
+   "n114.ReturnValue",
+   "n120.A"
+  ],
+  [
+   "n115.ReturnValue",
+   "n120.B"
+  ],
+  [
+   "n120.ReturnValue",
+   "n121.A"
+  ],
+  [
+   "n116.ReturnValue",
+   "n121.B"
+  ],
+  [
+   "n121.ReturnValue",
+   "n122.A"
+  ],
+  [
+   "n118.ReturnValue",
+   "n122.B"
+  ],
+  [
+   "n122.ReturnValue",
+   "n123.Condition"
+  ],
+  [
+   "n101.Completed",
+   "n123.execute"
+  ],
+  [
+   "n123.True",
+   "n124.execute"
+  ],
+  [
+   "n126.AddonName",
+   "n125.B"
+  ],
+  [
+   "n125.ReturnValue",
+   "n127.A"
+  ],
+  [
+   "n127.ReturnValue",
+   "n128.A"
+  ],
+  [
+   "n98.Nm",
+   "n128.B"
+  ],
+  [
+   "n128.ReturnValue",
+   "n129.A"
+  ],
+  [
+   "n129.ReturnValue",
+   "n130.Command"
+  ],
+  [
+   "n131.self",
+   "n130.WorldContextObject"
+  ],
+  [
+   "n124.then",
+   "n130.execute"
+  ]
+ ]
+}

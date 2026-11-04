@@ -17,13 +17,20 @@
 --   returnpointstoragepath (optional) a short key (letters, digits, _ . -) for a value kept in the player's save; used exactly as written
 --   noprepend    (optional)  accepted, does nothing today (reserved: a later version may prepend the map name)
 --   saves        (optional)  false switches saving inside the map off; default true (maps save like a stock zone)
+--   rifts        (optional)  how many rifts of the map the game keeps (a whole number, 0 or more); default 99. The donor zone keeps only 3 and removes the rest
 --   triggers     (optional)  list; missing or empty is fine. Kinds:
 --                  { "kind": "regions" }                                a row on the Hub computer's REGIONS page
 --                  { "kind": "level", "target": "/Game/ITR/Levels/Hub/L_Hub", "level": "/Game/Mods/MyMap/L_MyMap_Hub",
 --                    "type": "collision" | "grab", "object": "mydoorhandle1" }   an object in the author's trigger level, streamed in while
 --                                                                      the stock level "target" is visible. "object" is the actor name
 --                                                                      or a path ending in it. Two triggers with one level+target are one request
---                  { "kind": "exit", "type": "collision" | "grab", "object": "myexit1" }   an object in the map's own level that leaves it
+--                  { "kind": "exit", "type": "collision" | "grab", "object": "myexit1", "to": ..., "at": ... }   an object in the map's own level that leaves it.
+--                                                                      "to" (optional): another map's name (arrive at its start or return point), or a
+--                                                                      stock level tag such as Level.Zone.Buffer; missing = the Hub. "at" (optional, only
+--                                                                      with a level tag) is one object { "kind": ..., "value": ... }:
+--                                                                        { "kind": "object", "value": "Gate.HubToBuffer" }     a gate of that level
+--                                                                        { "kind": "coordinates", "value": [x, y, z] or [x, y, z, yaw] }
+--                                                                      a one-item list [ {...} ] is the same; a longer list uses the first item and logs it
 --                an unknown kind or a bad trigger is ignored with a log line
 --   enabled      (optional) false skips the file
 
@@ -110,7 +117,7 @@ end
 local function IsPkg(S) return type(S) == "string" and S:match("^/Game/[%w_/%-]+$") ~= nil end
 
 local Known = { schema = true, name = true, displayName = true, description = true, level = true, levelTag = true, start = true,
-                enter = true, triggers = true, enabled = true, returnpointstoragepath = true, noprepend = true, saves = true,
+                enter = true, triggers = true, enabled = true, returnpointstoragepath = true, noprepend = true, saves = true, rifts = true,
                 comment = true, ["_comment"] = true }
 
 local HUB = "/Game/ITR/Levels/Hub/L_Hub"
@@ -121,6 +128,31 @@ local function ObjectName(S)
     if type(S) ~= "string" then return nil end
     local N = S:match("([^/%.:]+)$")
     if N and N:match("^[%w_%-]+$") then return N end
+    return nil
+end
+
+-- An exit's destination: a form map's name (no dot) or a stock level tag (Level.Something)
+local function ValidTo(S) return type(S) == "string" and (S:match("^[%w_%-]+$") ~= nil or S:match("^Level%.[%w_%.]+$") ~= nil) end
+-- An exit's arrival spot in a stock level: { "kind": "object", "value": "<gate tag>" } gives the tag string; { "kind": "coordinates", "value": [x, y, z (, yaw)] } gives
+-- { X, Y, Z, Yaw }. A list holding one such object is the same thing; a longer list uses the first and says so (second result). nil when it is neither.
+local function ParseAt(A)
+    local Note = nil
+    if type(A) == "table" and A.kind == nil and A[1] ~= nil then
+        if #A > 1 then Note = "'at' has " .. #A .. " items: only the first is used (an exit has one destination)" end
+        A = A[1]
+    end
+    if type(A) ~= "table" then return nil end
+    if A.kind == "object" then
+        if type(A.value) == "string" and A.value:match("^[%w_%.]+$") then return A.value, Note end
+        return nil
+    elseif A.kind == "coordinates" then
+        local V = A.value
+        if type(V) == "table" and (#V == 3 or #V == 4) then
+            for I = 1, #V do if type(V[I]) ~= "number" then return nil end end
+            return { X = V[1], Y = V[2], Z = V[3], Yaw = V[4] or 0 }, Note
+        end
+        return nil
+    end
     return nil
 end
 
@@ -155,6 +187,14 @@ function M.Parse(Text, FileName)
     end
     if J.saves ~= nil and type(J.saves) ~= "boolean" then return nil, FileName .. ": 'saves' must be true or false", Warn end
     F.Saves = J.saves ~= false
+    F.Rifts = 99
+    if J.rifts ~= nil then
+        if type(J.rifts) == "number" and J.rifts >= 0 and J.rifts == math.floor(J.rifts) then
+            F.Rifts = J.rifts
+        else
+            table.insert(Warn, FileName .. ": 'rifts' must be a whole number, 0 or more: using 99")
+        end
+    end
     F.NoPrepend = J.noprepend == true                     -- accepted quietly; does nothing yet
     if J.returnpointstoragepath ~= nil then
         local K = J.returnpointstoragepath
@@ -185,7 +225,7 @@ function M.Parse(Text, FileName)
         end
         F.Start = { X = S.x, Y = S.y, Z = S.z, Yaw = S.yaw or 0 }
     end
-    F.Levels, F.Items, F.Exits, F.Regions = {}, {}, {}, false     -- F.Items stays an empty list: kind 'item' is gone
+    F.Levels, F.Exits, F.Regions = {}, {}, false
     if J.triggers ~= nil then
         if type(J.triggers) ~= "table" then return nil, FileName .. ": 'triggers' must be a list", Warn end
         -- A bad trigger loses only that trigger: the map stays registered.
@@ -210,8 +250,18 @@ function M.Parse(Text, FileName)
                     Bad("'type' must be collision or grab (got '" .. tostring(T.type) .. "')", Kind)
                 elseif not Name then
                     Bad("'object' must be the actor's name (letters, digits, _ or -), or a path ending in it", Kind)
+                elseif Kind == "exit" and T.to ~= nil and not ValidTo(T.to) then
+                    Bad("'to' must be another map's name or a level tag like Level.Zone.Buffer", Kind)
+                elseif Kind == "exit" and T.at ~= nil and not ParseAt(T.at) then
+                    Bad("'at' must be { \"kind\": \"object\", \"value\": \"Gate.HubToBuffer\" } or { \"kind\": \"coordinates\", \"value\": [x, y, z, yaw] }", Kind)
                 else
                     local Rec = { Index = I, Kind = Kind, Type = T.type, Object = T.object, ObjectName = Name }
+                    if Kind == "exit" then
+                        local AtV, AtNote = nil, nil
+                        if T.at ~= nil then AtV, AtNote = ParseAt(T.at) end
+                        if AtNote then table.insert(Warn, FileName .. ": trigger " .. I .. " (exit): " .. AtNote) end
+                        Rec.To, Rec.At = T.to, AtV
+                    end
                     if Kind == "level" then
                         Rec.Level, Rec.Target = T.level, Target
                         local Key = Rec.Level .. "|" .. Target
@@ -240,8 +290,8 @@ function M.ToMap(F)
     local S = F.Start
     return { Name = F.Name, DisplayName = F.Display, Desc = F.Desc, Level = F.Level, Command = F.Command, Handback = F.Command ~= nil,
         Regions = F.Regions, FromForm = true, Native = true, StartTag = "itr:player_start", NativeTag = F.Tag,
-        NativeStart = S, NativeCenter = S and { X = S.X, Y = S.Y, Z = 0 } or nil, NativeRadius = 250000, NativeSaves = F.Saves,
-        ReturnKey = F.ReturnKey, LevelGroups = F.Levels, ExitTriggers = F.Exits, File = F.File }
+        NativeStart = S, NativeCenter = S and { X = S.X, Y = S.Y, Z = 0 } or nil, NativeRadius = 250000, NativeSaves = F.Saves, NativeGenerators = F.Rifts,
+        ReturnKey = F.ReturnKey, File = F.File }
 end
 
 -- List = { { Name = "file.json", Path = "full path" }, ... }. Reads each file with io.open and checks it. Returns the accepted forms

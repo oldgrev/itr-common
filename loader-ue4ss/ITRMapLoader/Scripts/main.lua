@@ -22,6 +22,9 @@
 --      OnGameStarted, OnTransitionEnd, called on each actor in the map's level.
 --   The streaming mode was tested in VR with UE4SS 3.0.1 (the Nexus Mods ITR repack) for entry, exit markers and the
 --   basic load/unload; multiple exits, re-entry memory, Hub teardown and gameplay activation were not tested in game.
+-- RULE: never change level from an action. The transition start fires inside the transfer call and stock components clear their
+-- references there; an action runs inside whatever ProcessEvent the game is in, so native code can lose a reference mid-function
+-- (a crash with an NPC nearby). Native entry and exit run at frame end through RunLater (the engine's DEFER command).
 -- This file avoids Lua 5.4-only syntax so `luac5.1 -p` can check it.
 
 local UEHelpers = require("UEHelpers")
@@ -39,6 +42,15 @@ local Memory = {}            -- map name -> last exit id
 local function Log(fmt, ...) print(TAG .. string.format(fmt, ...) .. "\n") end
 
 local function Valid(o) return o ~= nil and o:IsValid() end
+
+-- A second copy of this loader never registers its maps (only the first copy to start gets the game mode's level hooks): say so once.
+do
+    local OkS, V = pcall(function() return ModRef:GetSharedVariable("ITRMapLoader.Loaded") end)
+    if OkS and V == 1 then
+        print(TAG .. "another ITRMapLoader copy is already loaded: only the first copy can hook the level events, so this copy will not register its maps; use one copy with several Maps or forms\n")
+    end
+    pcall(function() ModRef:SetSharedVariable("ITRMapLoader.Loaded", 1) end)
+end
 
 -- Option lookup: per-map value, then global config value, then default
 local function Opt(Map, Key, Default)
@@ -60,6 +72,20 @@ local function Now() return os.clock() * 1000 end
 -- RULE (UE4SS c62ada0): never call ExecuteInGameThread from inside a game-thread action, or from anything an action calls synchronously.
 -- Appending to its queue can reallocate it under the running pass and crash the game. Calling it from a hook, NotifyOnNewObject, a key
 -- bind, LoopAsync or ExecuteWithDelay is fine, as long as that caller is not itself inside an action.
+-- SECOND RULE (UE4SS, read in the DLL): a mod's FIRST ExecuteInGameThread adds an entry to an unlocked list that the game thread walks every frame, so that first
+-- call must come from the game thread outside any action (here: the game mode notification, C: NativeStartup). A mod that makes it from a LoopAsync tick
+-- or at start-up, off the game thread, can corrupt that list.
+-- Primed: this mod's first ExecuteInGameThread is made as an empty call from the game mode notification (the real BP_PRGameMode_C, not Default__),
+-- on the game thread outside any action. Nothing queues before that: the LoopAsync ticks below, the key and the console command wait for it.
+local Prime = { Done = false }
+pcall(NotifyOnNewObject, "/Script/IntoTheRadius.PRGameMode", function(Obj)
+    if Prime.Done then return end
+    local Ok, Cls = pcall(function() return Obj:GetClass():GetFName():ToString() end)
+    local Okn, Nm = pcall(function() return Obj:GetFName():ToString() end)
+    if not (Ok and Cls == "BP_PRGameMode_C") or (Okn and Nm:sub(1, 9) == "Default__") then return end
+    Prime.Done = true
+    ExecuteInGameThread(function() local S = Prime.Step; if S then S() end end)       -- the form path's step (boot.lua), else an empty call
+end)
 -- Runs fn on the game thread every ms until it returns true (or throws). LoopAsync runs on another thread, so the
 -- stop flag is only seen one round after the game thread set it. The flag lives in a table (shared by reference).
 -- IMPORTANT (UE4SS c62ada0): errors raised by UE4SS's functions (TMap:Find on a missing key, calling an invalid UFunction
@@ -70,6 +96,7 @@ local function Every(ms, fn, MaxCrashes)
     local St = { Done = false, Running = false, Crashes = 0 }
     LoopAsync(ms, function()
         if St.Done then return true end
+        if not Prime.Done then return false end
         ExecuteInGameThread(function()
             if St.Done then return end
             if St.Running then
@@ -1452,6 +1479,7 @@ local NativeTrip = nil       -- the current native transfer in progress { Map, T
 -- One record per native map (config maps and form maps). NativeState points at the record being worked on: every entry point selects the
 -- record of its map first (NativeSelect), then the functions below read and write it as they always did.
 local NativeList, NativeBy = {}, {}
+local NativeRegisterNow            -- defined after NativeAttempt
 local Maps = nil             -- maps.lua (form maps), set at the end of this file
 local function NativeNew(Map)
     local N = { Ready = false, Failed = nil, RowDone = false, CenterDone = false, LootDone = false, WorldAddr = nil,
@@ -1499,7 +1527,7 @@ end
 local LookCache = {}
 local function Cached(Key, Fn)
     local C = LookCache[Key]
-    if C and Valid(C.O) and Now() - C.T < 2000 then return C.O end
+    if C and Now() - C.T < 2000 and Valid(C.O) then return C.O end
     local O = Fn()
     LookCache[Key] = O and { O = O, T = Now() } or nil
     return O
@@ -1722,6 +1750,12 @@ local function NativeEnsureRow(SC)
     Row.InventoryAllowed = D.InventoryAllowed ~= false
     Row.SleepAllowed = Saves and (D.SleepAllowed == true) or false
     Row.AllowedGenerators = { Min = math.floor(tonumber(D.GenMin) or 0), Max = math.floor(tonumber(D.GenMax) or 0) }
+    -- The game keeps only AllowedGenerators of the level's rifts and removes the rest in OnLevelPrepare ("Excluded from this cruel world"); the donor zone allows 3,
+    -- so a map with 12 rifts would run 3. NativeGenerators = the number of rifts to keep (a form's "rifts", default 99).
+    local WantGen = tonumber(Opt(Map, "NativeGenerators", nil))
+    if WantGen and WantGen >= 0 then
+        Row.AllowedGenerators = { Min = math.floor(WantGen), Max = math.floor(WantGen) }
+    end
     Row.SaveOnExit = Saves and (D.SaveOnExit == true) or false
     Row.Autosave = Saves and (D.Autosave == true) or false
     Row.SaveOnLoad = Saves and (D.SaveOnLoad == true) or false
@@ -1887,8 +1921,36 @@ end
 
 local TryArrive = nil        -- defined in the level-event block below (it needs the trigger hook)
 
--- Enter the map through the game's level transfer. Returns true when the game accepted the transfer. The arrival is finished by
--- TryArrive, from the game's level events (OnLevelStarted / OnTransitionEnd), and once more by a one-shot check after 15 s.
+-- RULE: never change level from an action. TransferToLevel fires the transition start synchronously, and stock components clear their
+-- references in it. A UE4SS action runs inside whatever ProcessEvent the game happens to be in, so a transfer from one can pull those
+-- references out from under native code in mid-function (an NPC's sight update found a null Player: access violation).
+-- So a transfer asked for from Lua runs at the end of the frame, through the engine's DEFER console command, outside any ProcessEvent.
+local Later = nil
+local function RunLater(Fn)
+    if Later then Log("end of frame call: one is already waiting"); return false end
+    Later = Fn
+    Log("end of frame call: asked (itrmapdo)")
+    local Ok, E = pcall(function()
+        StaticFindObject("/Script/Engine.Default__KismetSystemLibrary"):ExecuteConsoleCommand(UEHelpers.GetWorld(), "defer itrmapdo", nil)
+    end)
+    if not Ok then Later = nil; Log("end of frame call failed: %s", tostring(E)); return false end
+    return true
+end
+if type(RegisterConsoleCommandHandler) == "function" then
+    pcall(RegisterConsoleCommandHandler, "itrmapdo", function()
+        local Fn = Later
+        Later = nil
+        if Fn then
+            Log("end of frame call: itrmapdo heard")
+            local Ok, E = pcall(Fn)
+            if not Ok then Log("end of frame call error: %s", tostring(E)) end
+        end
+        return true
+    end)
+end
+
+-- Enter the map through the game's level transfer. Returns true when the transfer was asked for (it runs at frame end). The arrival is finished by
+-- TryArrive, from the game's level events (OnLevelStarted / OnTransitionEnd).
 local function NativeEnter(Map, Why)
     if NativeTrip and Now() - NativeTrip.T0 > 200000 then NativeTrip = nil end       -- a stale record never blocks for good
     if NativeTrip then
@@ -1921,33 +1983,45 @@ local function NativeEnter(Map, Why)
     end
     Log("native: %s: calling TransferToLevel(%s) on %s (arrival position %s)", Why, Tag, GM:GetFName():ToString(),
         Return and "the return point" or (Saved and "saved for the level" or "from the game"))
-    local Res, Err = CallTransfer(GM, Tag, "None")
-    Log("native: %s: TransferToLevel(%s) -> %s", Why, Tag, Err or tostring(Res))
-    if Res ~= true then return false end
-    local Trip = { Map = Map, T0 = Now(), Phase = "transfer", Return = Return }
-    NativeTrip = Trip
-    ExecuteWithDelay(15000, function()
-        ExecuteInGameThread(function()
-            if NativeTrip == Trip and TryArrive then TryArrive() end
-        end)
+    -- the transfer itself runs at the end of the frame (see RunLater)
+    return RunLater(function()
+        if NativeTrip then Log("native: %s ignored: a transfer is already running", Why); return end
+        local Res, Err = CallTransfer(GM, Tag, "None")
+        Log("native: %s: TransferToLevel(%s) -> %s", Why, Tag, Err or tostring(Res))
+        if Res ~= true then return end
+        local Trip = { Map = Map, T0 = Now(), Phase = "transfer", Return = Return }
+        NativeTrip = Trip
+        -- No retry timer: the arrival is finished from the level events (OnLevelSettled), each of which logs "level not ready yet" when it cannot yet.
     end)
-    return true
 end
 
--- Leave the map through the game's level transfer (to HubLevelTag). Being back is noticed by TryBack, from the level events.
-local function NativeExit(Why)
+-- An exit to a spot in a stock level: the position for that level, written again from the level hooks because the game's position save overwrites it.
+local function SaveExitSpot()
+    local C = Current
+    if not (C and C.ExitSpot) then return end
+    local T = NativeStartTransform(C.Map, C.ExitSpot)
+    local GD = GetGameData()
+    if T and GD then pcall(function() GD.PlayerData:SavePosition(TagStruct(C.ExitTag), T, { X = 0, Y = 0, Z = 0 }) end) end
+end
+
+-- Leave the map through the game's level transfer: to To (a level tag), else to HubLevelTag. Arriving is noticed by TryBack, from the level events.
+local function NativeExit(Why, To, At)
     local GM = GetGameMode()
-    local Res, Err = CallTransfer(GM, HubLevelTag, Config.NativeExitLocation or "None")
-    Log("native exit (%s): TransferToLevel(%s) -> %s", Why, HubLevelTag, Err or tostring(Res))
+    local Tag = To or HubLevelTag
+    local Gate = type(At) == "string" and At or (not To and Config.NativeExitLocation) or "None"
+    Current.ExitTag, Current.ExitSpot = Tag, type(At) == "table" and At or nil
+    SaveExitSpot()
+    local Res, Err = CallTransfer(GM, Tag, Gate)
+    Log("native exit (%s): TransferToLevel(%s, %s) -> %s", Why, Tag, Gate, Err or tostring(Res))
     if Res ~= true then
-        Current.Phase = "active"
-        return
+        Current.Phase, Current.ExitTag, Current.ExitSpot = "active", nil, nil
     end
 end
 
 -- Pickup trigger (config NativeTriggerMesh = the name of a Hub item's static mesh): grabbing a Hub prop with that mesh starts the
 -- transfer. Hub props such as cups, books and tins are BP_PhysicsActor_C actors whose Mesh property names the static mesh.
--- The hook only reacts to the mesh named in this loader's own config, so several loader mods can share the grab event.
+-- The hook only reacts to the mesh named in a map's config entry. It is one RegisterHook on BP_PhysicsActor_C:OnGrip, and only the first mod to register a
+-- callback on a script function gets it called, so another mod hooking the same function can silence this one (or be silenced).
 -- BP_PhysicsActor_C implements the VRExpansion grip event OnGrip(GrippingController, GripInformation) as a Blueprint
 -- function, which the grip controller calls when a hand takes the item, so UE4SS can hook it like any script function.
 local TriggerHooked = false
@@ -2023,7 +2097,10 @@ local function LevelReady()   -- level manager idle, not in transition
     local LM = GetLevelManager()
     return LM ~= nil and (Config.RequireLevelManagerReady == false or LM:IsReady()) and not InTransition()
 end
-local function ResavePosition() if NativeTrip then NativeSavePosition(NativeTrip.Map) end end
+local function ResavePosition()
+    if NativeTrip then NativeSelect(NativeTrip.Map); NativeSavePosition(NativeTrip.Map, NativeTrip.Return)
+    else SaveExitSpot() end
+end
 
 -- Arrival: the level is the map's, visible, and the level manager is idle. Returns true when done or not applicable.
 TryArrive = function()
@@ -2051,6 +2128,9 @@ TryArrive = function()
     local R = Trip.Return
     if R then
         Want = { Loc = { X = R.X, Y = R.Y, Z = R.Z }, Rot = { Pitch = 0, Yaw = R.Yaw, Roll = 0 } }       -- the return point, not the start marker
+    elseif Map.FromForm and Map.NativeStart then
+        local S = Map.NativeStart                                                                         -- the form's start, not a marker 30 m away
+        Want = { Loc = { X = S.X, Y = S.Y, Z = S.Z }, Rot = { Pitch = 0, Yaw = S.Yaw or 0, Roll = 0 } }
     end
     Log("native: arrived after %.1f s: level %s, player at %s, %d TargetPoint(s), start marker %s",
         Ms / 1000, tostring(LevelNow), L and FmtV(L) or "?", #M.All, M.Start and "found" or "MISSING")
@@ -2065,13 +2145,18 @@ TryArrive = function()
     return true
 end
 
--- After a native exit: back in the Hub and the level manager idle
+-- After a native exit: at the destination and the level manager idle. Ending anywhere else is noted, so nothing stays "exiting" for good.
 local function TryBack()
     if not (Current and Current.Native and Current.Phase == "exiting") then return end
+    local Want = Current.ExitTag or HubLevelTag
     local LevelNow, World = LevelTagNow(), UEHelpers.GetWorld()
-    local Back = LevelNow == HubLevelTag or (LevelNow == nil and Valid(World) and IsHubVisible(World))
-    if Back and LevelReady() then
-        Log("native exit: back in %s", HubLevelTag)
+    local Back = LevelNow == Want or (Want == HubLevelTag and LevelNow == nil and Valid(World) and IsHubVisible(World))
+    if not LevelReady() then return end
+    if Back then
+        Log("native exit: back in %s", Want)
+        Current = nil
+    elseif LevelNow and LevelNow ~= NativeTagOf(Current.Map) then
+        Log("native exit: ended in %s, not %s", LevelNow, Want)
         Current = nil
     end
 end
@@ -2095,7 +2180,12 @@ local function NativeAttempt()
         NativeState = N
         if N.Map.Missing and not N.Failed then N.Failed = "level not installed" end
         if N.Map.Missing then
-            -- a map whose level is not installed is not registered and not listed; Maps logged it once
+            -- a map whose level is not installed is not registered and not listed (Maps logged it once). A save made in the level must still not strand the player.
+            local GD = GetGameData()
+            if GD and LevelTagNow() == N.Tag then
+                local Ok = pcall(function() GD.CurrentLevelTag = TagStruct(HubLevelTag) end)
+                Log("native: the loaded save is in %s, whose level is not installed: moved to %s: %s", N.Tag, HubLevelTag, Ok and "done" or "FAILED")
+            end
         else
             NativeRegisterTick()
             if NativeState.Ready and not TriggerHooked then NativeHookTrigger() end
@@ -2115,23 +2205,20 @@ end
 
 -- A save made in a map (NativeSaves on) loads the map's level through the game's own Continue: no transfer was started here, so this adopts it as
 -- the Showcase loader does: exits armed (for a form map: its exit triggers bound), a guard against a bad saved position. Called from the level events.
+-- Run once, inline, from the level event that adopts the save (no timer: a position that is only bad later is not caught).
 local function NativeGuardPosition(Map, S)
-    ExecuteWithDelay(3500, function()
-        ExecuteInGameThread(function()
-            if not (Current and Current.Map == Map) then return end
-            local L = PawnLoc()
-            if not L then return end
-            local C = Opt(Map, "NativeCenter", { X = 0, Y = 0, Z = 0 })
-            local Far = Dist2D(L, { X = C.X or 0, Y = C.Y or 0 }) > Opt(Map, "NativeRadius", 250000)
-            local Falling = OnMapGround(S) ~= true and L.Z < -50000
-            if Far or Falling then
-                local M = Valid(S) and ScanMarkers(Map, S) or nil
-                local Want = M and ChooseArrival(Map, M) or nil
-                Log("native: saved position %s is %s; moving the player to the arrival marker", FmtV(L), Far and "outside the map" or "falling")
-                if Want then TeleportPlayer(Want.Loc, Want.Rot, "arrival marker (bad saved position)") end
-            end
-        end)
-    end)
+    if not (Current and Current.Map == Map) then return end
+    local L = PawnLoc()
+    if not L then Log("native: the saved position could not be read at the adoption: not checked"); return end
+    local C = Opt(Map, "NativeCenter", { X = 0, Y = 0, Z = 0 })
+    local Far = (not Map.FromForm) and Dist2D(L, { X = C.X or 0, Y = C.Y or 0 }) > Opt(Map, "NativeRadius", 250000)   -- a form map is not moved for being far
+    local Falling = OnMapGround(S) ~= true and L.Z < -50000
+    if Far or Falling then
+        local M = Valid(S) and ScanMarkers(Map, S) or nil
+        local Want = M and ChooseArrival(Map, M) or nil
+        Log("native: saved position %s is %s; moving the player to the arrival marker", FmtV(L), Far and "outside the map" or "falling")
+        if Want then TeleportPlayer(Want.Loc, Want.Rot, "arrival marker (bad saved position)") end
+    end
 end
 local function NativeAdopt()
     if Current or NativeTrip then return end
@@ -2167,6 +2254,18 @@ local function OnLevelSettled(What)
     end)
 end
 
+-- Registration of every native map, asked once by BP_ITRMapManager at the first level change after the game started ("itrmaps register"). The two-checks-in-a-row gate is
+-- skipped: nothing polls. A map the level manager was too busy for is logged as waiting.
+NativeRegisterNow = function()
+    for _, N in ipairs(NativeList) do N.Checks = 1 end
+    NativeAttempt()
+    local Ready, Failed = 0, 0
+    for _, N in ipairs(NativeList) do
+        if N.Ready then Ready = Ready + 1 elseif N.Failed then Failed = Failed + 1 end
+    end
+    Log("registration (asked at the first level change): %d ready, %d failed, %d waiting", Ready, Failed, #NativeList - Ready - Failed)
+end
+
 local LevelHooksAsked = false
 -- Runs as ONE game-thread action. Never call ExecuteInGameThread in here, or in anything it calls synchronously: appending to UE4SS's
 -- queue from inside an action can reallocate it under the running pass (c62ada0) and crash the game. A failing RegisterHook ends the
@@ -2179,7 +2278,7 @@ local function AttachLevelHooks()
     -- the requests to ITRLevelAddons go out inline from inside the hook (a console command, nothing queued): a send from a level event is heard
     local function Send(What) if Maps then local Ok, E = pcall(Maps.OnLevelEvent, What); if not Ok then LogOnce("sendr" .. What, "level event %s: %s", What, tostring(E)) end end end
     H("DoSavePlayerPosition", function() ResavePosition() end)
-    H("OnTransitionStart",    function() ResavePosition() end)
+    H("OnTransitionStart",    function() if Maps then Maps.ForgetBinds() end; ResavePosition() end)
     H("OnLevelPrepare",       function() Send("OnLevelPrepare"); ResavePosition(); ExecuteInGameThread(NoteLeft) end)
     H("OnLevelStarted",       function() Send("OnLevelStarted"); OnLevelSettled("OnLevelStarted") end)
     H("OnTransitionEnd",      function() Send("OnTransitionEnd"); OnLevelSettled("OnTransitionEnd") end)
@@ -2203,7 +2302,7 @@ local function NativeStartup(FormMaps)
         N.Tag, N.Sub = NativeTagOf(N.Map), NativeSubOf(N.Map)
         Log("native: registering %s as %s (main sublevel %s) once the game is idle", N.Map.Name, N.Tag, N.Sub)
     end
-    local NeedHooks = #NativeList > 0 or (Maps ~= nil and #Maps.Groups > 0)
+    local NeedHooks = #Config.Maps > 0          -- the form path has no hook: its Blueprints listen to the game's level events themselves
     if not NeedHooks then return end
     -- Only the Blueprint game mode (BP_PRGameMode_C) counts: a notification for the native class or a default object can arrive before the
     -- Blueprint class is bound, and hooking its functions then crashes the game (seen 1 s after start).
@@ -2411,14 +2510,17 @@ local function SimpleExit()
     end
 end
 
-local function StartExit(Why)
+local function StartExit(Why, To, At)
     if not Current or Current.Phase ~= "active" then
         Log("%s ignored: the map is %s", Why, Current and Current.Phase or "not loaded")
         return
     end
     Log("leaving %s (%s)", Current.Map.Name, Why)
     Current.Phase = "exiting"
-    if Current.Native then NativeExit(Why)
+    if Current.Native then
+        if not RunLater(function()
+            if Current and Current.Native and Current.Phase == "exiting" then NativeExit(Why, To, At) end
+        end) then Current.Phase = "active" end
     elseif Current.TornDown then HubExit() else SimpleExit() end
 end
 
@@ -2537,6 +2639,7 @@ if KeyName ~= false then
         Log("config Key '%s' is not a UE4SS key name; no key is bound", tostring(KeyName))
     else
         RegisterKeyBind(Code, function()
+            if not Prime.Done then return end          -- not primed yet: nothing queues
             ExecuteInGameThread(function()
                 if Current then
                     StartExit("key")
@@ -2562,9 +2665,17 @@ if CommandName and type(RegisterConsoleCommandHandler) == "function" then
     local OkC, ErrC = pcall(RegisterConsoleCommandHandler, CommandName, function(FullCommand, Parameters)
         local Verb = Parameters and Parameters[1] and tostring(Parameters[1]):lower() or "enter"
         local Name = Parameters and Parameters[2] and tostring(Parameters[2]) or nil
+        if Verb == "leave" then
+            if not Prime.Done then Log("console command: not ready yet (the game mode has not started); ignored"); return true end
+            ExecuteInGameThread(function()
+                if Current then StartExit("console command") else Log("console command: leave ignored: no map is loaded") end
+            end)
+            return true
+        end
         local Map = Config.Maps[1]
         if Name then Map = MapByName(Name) end
         if not Map then return false end
+        if not Prime.Done then Log("console command: not ready yet (the game mode has not started); ignored"); return true end
         ExecuteInGameThread(function()
             if Verb == "leave" then
                 if Current then StartExit("console command") else Log("console command: leave ignored: no map is loaded") end
@@ -2584,6 +2695,7 @@ end
 -- Lets an unattended run start the load at a moment of its choosing instead of when the Hub is first seen.
 if Config.TriggerFile then
     LoopAsync(1000, function()
+        if not Prime.Done then return false end
         ExecuteInGameThread(function()
             local Ok, F = pcall(io.open, Config.TriggerFile, "r")
             if not Ok or not F then return end
@@ -2641,6 +2753,7 @@ if Config.AutoLoadInHub then
         -- While a map is loaded the Hub may be gone (teardown); that is not a new visit, so nothing resets then.
         local HubChecks, LoadedThisVisit = 0, false
         LoopAsync(2000, function()
+            if not Prime.Done then return false end
             ExecuteInGameThread(function()
                 -- Native map: no timed entry. The transfer starts when the trigger item is picked up (NativeTriggerMesh),
                 -- or with the key. Only a failed registration with NativeFallback = true streams the map in as before.
@@ -2667,46 +2780,25 @@ if Config.AutoLoadInHub then
     end
 end
 
--- Map forms (Content/Paks/ITRMaps): read by the copy installed as "ITRMapLoader" (a renamed copy reads none, as it starts no Regions page).
+-- Map forms (Content/Paks/ITRMaps): read by the copy installed as "ITRMapLoader" (a renamed copy reads none, as it starts no Regions page). boot.lua (the form path, Blueprint
+-- first) spawns the Blueprints at the game mode notification, which runs Prime.Step above; this file only registers the maps with the game, once, when the manager asks.
 local FormMaps = {}
 do
     local Dir = tostring(ScriptDir() or ""):gsub("\\", "/"):lower()
     local ReadForms = Config.Forms
     if ReadForms == nil then ReadForms = Dir:find("/itrmaploader/", 1, true) ~= nil end
     if ReadForms then
-        local OkM, M = pcall(require, "maps")
+        local OkM, M = pcall(require, "boot")
         if OkM then
             Maps = M
-            Maps.Init({
-                Exec = function(Cmd)
-                    local OkK, KSL = pcall(StaticFindObject, "/Script/Engine.Default__KismetSystemLibrary")
-                    if not OkK or not Valid(KSL) then return false end
-                    return (pcall(function() KSL:ExecuteConsoleCommand(UEHelpers.GetWorld(), Cmd, nil) end))
-                end,
-                EnterNative = function(Map, Why, Anywhere) return Enter(Map, Why, Anywhere) end,
-                Leave = function(Why) StartExit(Why) end,
-                CurrentMap = function() return Current and Current.Map or nil end,
-                GameData = function() return GetGameData() end,
-                PawnLoc = function() return PawnLoc() end,
-                PawnYaw = function()
-                    local Pawn = UEHelpers.GetPlayer()
-                    if not Valid(Pawn) then return nil end
-                    local Ok, R = pcall(function() return Pawn:K2_GetActorRotation().Yaw end)
-                    return Ok and R or nil
-                end,
-                StreamOf = function(Map)
-                    local World = UEHelpers.GetWorld()
-                    return Valid(World) and FindNativeEntry(World, NativeSubOf(Map)) or nil
-                end,
-                EntryByInstance = function(Instance)
-                    local World = UEHelpers.GetWorld()
-                    return Valid(World) and FindNativeEntry(World, Instance) or nil
-                end,
-            })
+            Maps.Init({ Register = function() NativeRegisterNow() end, ConfigMaps = Config.Maps, Command = Config.ConsoleCommand })
             local OkR, Own = pcall(Maps.Read)
-            if OkR then FormMaps = Own else Log("forms: not read: %s", tostring(Own)) end
+            if OkR then FormMaps = Own; Prime.Step = Maps.Step else Log("forms: not read: %s", tostring(Own)) end
+            if type(RegisterConsoleCommandHandler) == "function" then
+                pcall(RegisterConsoleCommandHandler, "itrmaps", function(_, Params) return Maps.Console(Params) end)
+            end
         else
-            Log("forms: maps.lua not loaded: %s", tostring(M))
+            Log("forms: boot.lua not loaded: %s", tostring(M))
         end
     end
 end
@@ -2719,17 +2811,4 @@ Log("ready: %d map(s); key %s%s; native %s; Hub teardown %s; re-entry %s; gamepl
     Opt(nil, "HubTeardown", true) and "on" or "off", Opt(nil, "ReEntry", true) and "on" or "off",
     Opt(nil, "ActivateGameplay", true) and "on" or "off", ScriptDir())
 
--- Regions page on the Hub's mission computer (regions.lua): hooks and a console command, registered last, after everything else has run, so
--- that a failure there can only lose Regions, never the loader. Only the copy installed as "ITRMapLoader" starts it, so a renamed copy of
--- this loader (a second map loader mod) does not make a second Regions page. Config Regions = true / false overrides.
-do
-    local Dir = tostring(ScriptDir() or ""):gsub("\\", "/"):lower()
-    local On = Config.Regions
-    if On == nil then On = Dir:find("/itrmaploader/", 1, true) ~= nil end
-    if not On then
-        Log("regions: off in this copy")
-    else
-        local OkR, ErrR = pcall(function() require("regions").Start({ Maps = Maps }) end)
-        if not OkR then Log("regions: not started: %s", tostring(ErrR)) end
-    end
-end
+-- The Regions page: boot.lua spawns its Blueprint and registers the one Construct hook (regions.lua) at the game mode notification, when a map is listed.

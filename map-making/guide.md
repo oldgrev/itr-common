@@ -1,25 +1,41 @@
 # Making maps for Into the Radius 1 (2.7.2)
 
-This is how we got a custom map into ITR1 and walked around it in VR. Most of what you need is in this repo. The bits
-that aren't are Unreal Engine itself, UE4SS, and the community ITR-SDK if you want to use the game's assets.
+This guide walks through the setup we used to build a custom ITR1 map and explore it in VR. There is quite a bit
+of setup, especially if you need to build the editor, so it is fine to take it a section at a time. Most of the
+scripts and example files are here in the repo. You will also need Unreal Engine, UE4SS, and the community ITR-SDK
+if you want to use the game's assets.
 
-If you want to spawn things at runtime, mess with lighting from a mod and so on, that's in [`extended.md`](extended.md).
+For your first map, work through sections 0–6. Section 7 lists what we have tested, and section 8 is there for
+when something goes wrong. The longer patch explanations in section 3 are reference material; you can come back
+to them when you need the details.
 
-Where we say *tested* we've done it in game. *Untested* means written but never run, and *unexplored* means nobody
-has tried it as far as we know. Newer parts use finer labels: *VR-tested* means someone wore the headset,
-*harness-tested* means the game ran with `-nohmd` under a script that sent commands and checked the game's state and
-log with nobody watching (see [`extended.md`](extended.md)), and *offline only* means we checked files or ran tools
-but never the game.
+If you want a mod to spawn things while the game is running, change lighting, or add other behaviour, see
+[`extended.md`](extended.md).
+
+You will see testing labels throughout the guide. They matter because a successful build does not always mean
+something works in the game:
+
+- *Tested*: we have tried it in the game.
+- *VR-tested*: someone tried it wearing the headset.
+- *Harness-tested*: a script ran the game with `-nohmd`, sent commands, and checked the game's state and log unattended
+  (see [`extended.md`](extended.md)).
+- *Offline only*: we checked files or ran tools, but did not run the game.
+- *Untested*: written, but never run.
+- *Unexplored*: nobody has tried it, as far as we know.
+
+The more specific labels appear in the newer sections.
 
 ## 0. Do you need the special editor?
-Probably only if you want your own materials.
+Probably only if you want your own materials. This is worth deciding first: building the special editor is the
+longest part of the setup. The stock-editor route below is based on reusing the game's existing materials; do not
+treat it as a promise that every asset combination has been tested.
 
 | You want | Use |
 |---|---|
 | A map made from the game's meshes and materials, plus Unreal's basic shapes | Route A: stock UE 4.27.2 from the Epic launcher |
 | Your own materials, material instances with static switches or overridden base properties, or a landscape | Route B: the special editor (§3), which is Meta's Oculus fork of UE 4.27 with our layout patch on top |
 
-So why do gun mods work fine in stock 4.27 when levels with custom materials don't? Gun mods reuse materials that
+The confusing part is that gun mods can work in stock 4.27 while maps with custom materials fail. Gun mods reuse materials that
 are already in the game, so they never compile a shader, and a level can do the same. Once you make a new material,
 though, your editor compiles a shader for it. That shader reads things like the camera, the object's position and the
 lighting from blocks of memory ("uniform buffers") laid out at fixed offsets, and those offsets are baked in when the
@@ -34,11 +50,11 @@ the real layouts out of the game's exe and compared:
 A shader built against the wrong layout reads the wrong memory. In practice the game either crashes on the render
 thread as soon as it's on screen, or draws it black.
 
-Things that don't compile shaders, so route A is fine:
+These assets do not compile new shaders, so they fit route A:
 - meshes, textures, sounds, blueprints;
 - plain instances of the game's materials where you only change parameters.
 
-Things that do, so you need route B:
+These do compile shaders, so use route B:
 - any new material, even a flat colour;
 - instances with static switches or overrides;
 - landscapes (each landscape component gets a material instance);
@@ -64,12 +80,15 @@ Things that do, so you need route B:
    .\extract-game-config.ps1 -Engine "C:\Program Files\Epic Games\UE_4.27\Engine"   # or your special editor's Engine folder
    ```
    Under the hood that's just `UnrealPak.exe <pakchunk0> -Extract <tmp> "-Filter=*Config/Default*.ini"`. The editor
-   will moan about missing game classes when it starts. You can ignore that.
+   will warn about missing game classes when it starts. Those warnings are expected here; you can ignore them.
 3. `Config\DefaultGame.ini` is already set up like the game's packaging (`bShareMaterialShaderCode=False`,
    `bUseIoStore=False`).
 4. Open `IntoTheRadius.uproject`. For route B, right-click it first and switch the engine version to your build.
 
 ## 3. Route B: building the special editor
+This is the time-consuming bit. Allow a few hours and about 150 GB of free space before you start.
+The commands below cover getting the source, fixing its downloads, applying the patches, and building the tools.
+
 **Getting access.** The fork is at `github.com/Oculus-VR/UnrealEngine`. You'll only see it with a GitHub account
 linked to an Epic account (on unrealengine.com: account, Apps and Accounts, GitHub, then accept the invite to the
 EpicGames org). I don't remember linking a Meta developer account, so it may not be needed. If the links below 404,
@@ -91,7 +110,10 @@ if your assets use the game's contact-shadow component,
 [`engine/itr-contactshadowimpostor.hashpatch.json`](../engine/itr-contactshadowimpostor.hashpatch.json)
 (contributed by [ChuckSharts](https://github.com/ChuckSharts/)).
 
-Realistically, apply them all to save having to build again in the future.
+If you expect to use these features later, applying all the patches now can save another build. Keep in mind that
+the ContactShadowImpostor patch has not been compile-checked yet; its limits are explained below.
+
+In the commands, replace `<itr-common>` with the path to this repo.
 
 ```bat
 :: 1. Get the source at the release tag. Keep the path short, UnrealBuildTool falls over on paths
@@ -129,6 +151,11 @@ Engine\Build\BatchFiles\Build.bat ShaderCompileWorker Win64 Development -WaitMut
 Engine\Build\BatchFiles\Build.bat UnrealPak Win64 Development -WaitMutex
 ```
 
+### Build details and patch notes
+
+The rest of this section explains what changed and how to check your build. You do not need to understand every
+shader detail to use the editor, but do run the build check and read the material settings at the end.
+
 When we ran the merge, it kept 63,981 files at their 4.27.1 versions. It took 146 from later 4.27 because the old
 ones aren't hosted any more (localization, a few media DLLs, some plugin assets). It dropped 142 files nobody needs
 for a build (CI configs, Dockerfiles, `.ps1`). If you want to compare your files with ours, here are the SHA-256s:
@@ -149,7 +176,7 @@ So the patch doesn't contain any of Epic's lines. It points at the lines it repl
 moved lines by where they are in your copy. The only text in it is what we wrote. Applying it to a clean checkout
 came out the same as our patched engine. That's our reading of the EULA, not legal advice.
 
-**What the patch changes** (20 files):
+**What the layout patch changes** (20 files):
 - the `View` / `InstancedView` buffers: 5 `Prev*` matrices taken out, contact-shadow members added;
 - `Primitive`: the spherical-harmonic lighting moves in from `IndirectLightingCache`, and there are 5 custom-data slots;
 - the shared base pass (stereo screen-space reflections) and scene textures;
@@ -228,7 +255,7 @@ don't resolve. The patch adds it to the Engine module under its original path:
   property;
 - the declaration and the constructor default come from the game's reflection (UHT) dump.
 
-Limits: this is class and serialization compatibility only. The game's contact-shadow rendering isn't reconstructed,
+The important limit here is that this only lets the engine recognise the class and read or save its data. The game's contact-shadow rendering isn't reconstructed,
 so the component does nothing visible. The patch hasn't been compile-checked in an engine build yet; it does apply
 cleanly (the files it creates must not exist yet, and a second apply is refused).
 
@@ -246,7 +273,7 @@ once you're on an engine with this patch. Only do this after switching to the pa
 
 Don't remove the workaround while you're still on an engine without the class.
 
-**Checking your build.** It's worth doing before you make anything. This compares the uniform buffers your editor
+**Checking your build.** Run this before spending time on a map, so you can catch a mismatched editor early. This compares the uniform buffers your editor
 builds with the game's (`pip install pefile capstone` first):
 ```bat
 cd <itr-common>\tools
@@ -271,7 +298,8 @@ quick check that route B works: if the floor shows a checker pattern in game, yo
 the navmesh (below). The script is short and worth reading alongside this. The example's
 [README](../example-map/README.md) has the commands, including how to run things headless.
 
-A few rules we worked out:
+Here are the placement and setup details we had to work out along the way. Some are quite specific to ITR,
+particularly the world coordinates and the Hub behaviour.
 - **Where it goes.** Put the map at `/Game/Mods/<Name>/L_<Name>`. Sublevels are fine.
 - **Where it sits in the world.** Build it where it'll actually be in game, because the loader streams it in at zero
   offset (navmesh tiles are stored in absolute coordinates). Three things decide where that can be:
@@ -288,12 +316,12 @@ A few rules we worked out:
      so the cause lives somewhere in those levels (not `L_Common`, not game code), and we haven't worked out which
      level or why.
 
-  The fix for 3 is to get rid of the Hub while your map is loaded: put the player on a spot on your map east of about
+  For issue 3, the workaround is to unload the Hub while your map is loaded: put the player on a spot on your map east of about
   X −20,000, unload every other streaming level, wait until they're gone, and only then move the player to the real
   start. The exit has to bring the Hub back (§6). *Harness-tested* on the showcase map: after the teardown the player
   stayed put for 20 s, and teleport points across the 2.5 km map each held for 10 s. We haven't been back in VR since
   the fix. The UE4SS loader has this built in, but it's untested in its Lua form (see the
-  [loader README](../loader-ue4ss/README.md)). It also takes the Hub's fog and lighting away, so give your map fog and lighting.
+  [loader README](../loader-ue4ss/README.md)). It also removes the Hub's fog and lighting, so your map needs its own.
   We expect that to be a good thing but haven't looked at it in VR.
 - **Start and exit.** Put a `TargetPoint` tagged `itr:player_start` where players should arrive (Details, Actor,
   Tags). Add another tagged `itr:exit`, with something visible on it. Stepping onto that one takes you back to the
@@ -335,14 +363,14 @@ A few rules we worked out:
     [`extended.md`](extended.md) (a runtime mod, or the UE4SS loader): 2 Mimics spawned and stood on the navmesh, and
     loot points produced items.
 
-  The earlier way, spawning things from markers at runtime, is still in [`extended.md`](extended.md) but you won't
-  want it for spawners, stashes and loot any more.
+  The older approach of spawning things from markers at runtime is still described in [`extended.md`](extended.md).
+  For spawners, stashes and loot, placing the blueprints in the editor is now the better starting point.
 
 ### Editor stand-ins (for game assets that aren't in any SDK)
 About two thousand of the game's assets are in none of the SDKs we looked at, among them the tower crane, vehicles, and
 a lot of tunnel, cave and pier meshes. The cooked map only stores asset *paths* for things it references, and the pak
-only holds `/Game/Mods/<Name>`. So the editor only needs *something* at the identical package path to place, size and
-collide against. In game the real asset gets loaded in its place.
+only holds `/Game/Mods/<Name>`. For editing, a placeholder at the identical package path is enough to position the asset, check its size and
+provide collision. The game then loads the real asset in its place.
 
 Our `standins.py` does that for static meshes. It reads the mesh out of the game's files (you unpack them yourself),
 writes an FBX with the game's simple collision, material slot names and lightmap settings, and imports that at the
@@ -361,8 +389,8 @@ game yet. The tool lives in the showcase repo (`itr-showcase`) for now, not in t
 exporter of ours as well.
 
 ### Navmesh (tested)
-NPCs can only walk on navmesh, and the game never builds any at runtime (`RuntimeGeneration=DynamicModifiersOnly`).
-So you bake it into your map.
+The navmesh tells NPCs where they can walk. ITR does not build it while the game is running
+(`RuntimeGeneration=DynamicModifiersOnly`), so you need to build, or “bake”, it in the editor and save it with your map.
 
 The game bakes its whole navmesh into `L_Common`, the level that's always loaded. It's two navmeshes,
 `RecastNavMesh-Default` and `RecastNavMesh-Big`, and their agents are set in `DefaultEngine.ini`. Since you copied
@@ -374,7 +402,7 @@ with the same name. You can't open `L_Common` in the editor because it only exis
 example uses a small editor-only stand-in, `L_ExampleHost`. Your map is a sublevel of it, and its navmesh actors
 get the same names as the game's.
 
-There's one catch that took us a while. The game's `DefaultEngine.ini` sets `bAutoCreateNavigationData=False`, so the
+If Build Paths seems to do nothing, this is probably why. The game's `DefaultEngine.ini` sets `bAutoCreateNavigationData=False`, so the
 editor never creates the navmesh actors and Build Paths quietly does nothing. You have to switch auto-create on for
 the session and re-register the bounds volumes, and then it creates both navmeshes.
 [`build_navmesh.py`](../example-map/Scripts/build_navmesh.py) does all that, builds, waits for it to finish and saves.
@@ -399,6 +427,9 @@ save tiles into the sublevel when we tried it. If you want to run it unattended,
 returns, before the build has run.
 
 ## 5. Cook, pack and install
+“Cooking” turns the editor assets into files the game can load. Packing puts those files into a `.pak`, and
+installing copies that pak into the game. The example script handles all three:
+
 ```powershell
 .\build-map.ps1 -Engine "C:\ue427\Engine" -Map Example -Install
 ```
@@ -410,16 +441,16 @@ returns, before the build has run.
    files under `Saved/Cooked/WindowsNoEditor/IntoTheRadius/Content/Mods/<Name>/` go in. Anything else from the cook
    (engine content, SDK copies) would replace the game's files, which you don't want. A line looks like:
    `"C:\...\Saved\Cooked\WindowsNoEditor\IntoTheRadius\Content\Mods\Example\L_Example.umap" "../../../IntoTheRadius/Content/Mods/Example/L_Example.umap"`
-3. Packs it: `UnrealPak.exe zzz_ITRMap_<Name>_P.pak -create=<response file>`. The game happily loads unsigned paks
+3. Packs it: `UnrealPak.exe zzz_ITRMap_<Name>_P.pak -create=<response file>`. The game loads unsigned paks
    (there are no `.sig` files). The `_P` suffix makes it a patch pak, so it mounts after the game's.
-4. Copies the pak into `<game>\IntoTheRadius\Content\Paks\`. You need to restart the game whenever it changes.
+4. Copies the pak into `<game>\IntoTheRadius\Content\Paks\~mods\` (every pak goes in `~mods`). You need to restart the game whenever it changes.
 
 We built the example this way with the special editor in October 2026. Generating the map headless, building the
 navmesh and cooking took a couple of minutes, and the pak has the map plus the material (30 compiled shaders). In VR,
 loaded by the UE4SS script from the Hub, the checker floor rendered properly, you start at the marker, and enemies we
 spawned stood on the navmesh. The result is [`example-map/prebuilt/zzz_ITRMap_Example_P.pak`](../example-map/prebuilt/).
 
-A couple of things to watch:
+If you rebuild later, keep these two things in mind:
 - After any engine or shader change, delete `Saved/Cooked` first. `-iterate` cooks don't notice those.
 - Once, a script changed a material's usage flags while the open level was drawing it, and the editor hit a
   render-thread assert. We only saw it once and didn't dig into it.
@@ -432,7 +463,16 @@ We use a UE4SS Lua script, [`loader-ue4ss/`](../loader-ue4ss/). Its README cover
 install on the Nexus page: the **contents** of the zip's `ue4ss` folder go into `Content\Paks`, and `Mods` gets renamed to
 `LuaMods` there.
 
-### The native way (the default)
+### The easy way: a map form
+If you only need the map registered and entered, skip the Lua: write a small text file next to your pak and let ITRMapLoader do the rest
+(see [`loader-ue4ss/README.md`](../loader-ue4ss/README.md#map-forms-a-pak-and-a-text-file) and the example in [`../example-form/`](../example-form/)).
+Ways in and out are plain objects you place and name in your levels. For a *grab* trigger the object must be grabbable: place a `GrippableStaticMeshActor`
+(VRExpansion plugin), give it the tags `Grip.Trigger.IndexGrip` and `Grip.NoDistanceGrip`, and use a collision preset that overlaps the Hand channel, such as
+`Drawer` (not `BlockAll`). Map forms are new and only partly tested (a hand grab has not been tried, and the game crashed after some map entries in the tests): the "What has been run" table at the end of the loader README says what has been shown to work.
+
+### The native way (the config.lua route)
+Start with this mode unless you have a reason to use the older streaming approach below.
+
 The loader registers your map with the game as a level, then enters it with the same call a zone gate makes. At startup
 it adds three things in memory: an unloaded streaming entry named after your map's world, a row in the game's level table
 under a tag such as `Level.Zone.MyMap`, and a map centre. The tag and world name are the only link between your map and the
@@ -441,11 +481,11 @@ Entering calls the game mode's `TransferToLevel`, so you get the game's transiti
 solves the snap-back problem in §4), the level start events that make spawners, loot and anomalies work, and the level
 rules (time, inventory, generators). Leaving the same way brings you back to the Hub.
 
-What you do:
+To set up your map:
 1. In the map, place a `TargetPoint` tagged `itr:player_start` where people arrive, and one or more tagged `itr:exit`,
    each with something visible on it. Please don't skip the exit: in VR there's no other way back apart from quitting to
    the menu.
-2. Build the map where it will sit in the world (§4), cook and pack it (§5), and put the pak in `Content\Paks`.
+2. Build the map where it will sit in the world (§4), cook and pack it (§5), and put the pak in `Content\Paks\~mods`.
 3. In the loader's `config.lua`, set the map's entry: `Name`, `Level` (the cooked package path), `StartTag`,
    `NativeCenter` (the middle of the playable area, world cm), `NativeStart` (the start marker's position), and the entry
    trigger: `NativeTriggerMesh` (the name of a Hub item's static mesh; picking that item up enters the map) and/or the
@@ -462,8 +502,12 @@ Hub and anything you left in the map would be gone. The tags pak holds a one-lin
 [`example-map/build-tags.ps1`](../example-map/build-tags.ps1) (`-Map <Name>`; `build-map.ps1` runs it for you), and put
 `zzz_ITRMap_<Name>_Tags_P.pak` next to the map pak. The details and a check are under "Saving" in the loader README.
 
-Limits: one native map per loader folder (copy the folder to load several, each with its own item and key), UE4SS 3.0.1
-only, the level exists in memory only (it is registered again on every game start), and you enter from the Hub.
+A few limits to keep in mind:
+
+- Each loader folder handles one native map. To load several, copy the folder and give each map its own item and key.
+- This needs UE4SS 3.0.1.
+- The level registration exists only in memory, so the loader registers it again each time the game starts.
+- You enter from the Hub.
 
 ### Streaming it in yourself (the fallback)
 The loader keeps the older mode (`Native = false`), which streams the map in next to the Hub and moves the player. It is
@@ -471,8 +515,8 @@ less complete (no transition screen, the game doesn't know the map is a level, a
 level-start events by hand), and the steps below are what it, or a loader you write, has to do. Of these, the entry, one
 exit and the unload were tested in VR; the Hub teardown and the activation pass were not run in game in Lua.
 
-If you want to stream a map in yourself, this is what has to happen. Everything here is a blueprint-callable engine
-function.
+If you are writing your own streaming loader, use this sequence. The engine functions here can all be called
+from blueprints.
 1. In the Hub, call
    `LevelStreamingDynamic::LoadLevelInstance(World, "/Game/Mods/<Name>/L_<Name>", (0,0,0), (0,0,0), bSuccess)`.
    Don't do it from the main menu, because the teleport claims it worked but the VR player doesn't actually move.
@@ -492,7 +536,7 @@ function.
 5. To unload, call `SetShouldBeVisible(false)` and `SetShouldBeLoaded(false)` on the streaming level, after you've
    moved the player off it. Never before: the first time we unloaded a map under the player in VR they fell into the
    void and then ended up at the main menu.
-6. **If your map reaches west of X −30,000 (§4), tear the Hub down.** *Harness-tested* (in our C++ mod, not in a Lua
+6. **If your map reaches west of X −30,000 (§4), unload the Hub.** *Harness-tested* (in our C++ mod, not in a Lua
    port yet), after a VR attempt without it failed:
    1. Stream the map in and wait until it's visible.
    2. Teleport the player to a `TargetPoint` on your map with world X greater than about −20,000 (the loader takes
@@ -510,11 +554,14 @@ function.
    that exit worked, the player ended in `Level.Hub` with the Hub levels visible, and the map was gone. If you
    do all this, it's easiest to let the loader's streaming mode ([`loader-ue4ss/`](../loader-ue4ss/)) do it, though its version hasn't run in game yet.
 
-Working out when you're really in the Hub is fiddlier than it sounds. While you're coming from the menu, the Hub level
+There is one more timing issue: “visible” does not always mean the Hub is ready for the player. While you're coming from the menu, the Hub level
 shows as visible even though you're still standing in the menu room. Our script also waits for
 `LevelManager::IsReady()`, and checks twice, 2 s apart.
 
 ## 7. What works and what doesn't
+Use this as a quick reference when deciding what to put in your map. Where a row mentions streamed maps or Hub
+workarounds, check section 6 for the difference between native mode and the older streaming mode.
+
 | Feature | Status |
 |---|---|
 | Geometry, collision, game meshes, plain game materials | Works with either route |
@@ -532,12 +579,15 @@ shows as visible even though you're still standing in the menu room. Our script 
 | AI cover (mimics taking cover) | The data format is understood and we have an offline generator, but nobody has seen a mimic use it yet ([`extended.md`](extended.md)). Offline only |
 
 ## 8. When things go wrong
+Start with the symptom below. A failed load is often a path or editor-version issue, rather than a problem with
+the map itself.
+
 - Crash reports end up in `%LOCALAPPDATA%\IntoTheRadius\Saved\Crashes\` (`CrashContext.runtime-xml` plus a
   minidump). The shipping game doesn't write a log.
 - If the game crashes on the render thread or things go black as soon as your map is in view, a shader was most
   likely built with the wrong engine (§0).
 - "Serialization Error: Corrupt data found" usually means a package was cooked with a different engine version.
-- If the loader says the level failed to load, check that the pak is in `Content\Paks`, that its name ends in `_P`,
+- If the loader says the level failed to load, check that the pak is in `Content\Paks\~mods`, that its name ends in `_P`,
   and that the path is right (`/Game/Mods/<Name>/L_<Name>`, no extension).
 - If the game hangs at startup with UE4SS installed (no window, about 12 MB of memory), there's a hidden "UE4SS
   Error: Failed to load UE4SS.dll" box. `UE4SS.dll` isn't where `override.txt` says it is. We did this by copying the

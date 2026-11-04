@@ -1,0 +1,500 @@
+{
+ "once": false,
+ "_doc": "ITRLevelAddons manager. Place(AddonName, LevelPath, TargetName, Hides, HideLevels, Loc, Rot, Scale) makes one BP_ITRLevelAddon (a name already placed is ignored) and leaves its Report in LastReport.",
+ "asset": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddons",
+ "parent": "/Script/Engine.Actor",
+ "components": [],
+ "variables": [
+  {
+   "name": "Names",
+   "type": "string",
+   "default": "|"
+  },
+  {
+   "name": "Keys",
+   "type": "string",
+   "default": "|"
+  },
+  {
+   "name": "LastReport",
+   "type": "string",
+   "default": ""
+  }
+ ],
+ "cdo": {
+  "PrimaryActorTick": "(bCanEverTick=False)"
+ },
+ "nodes": [
+  {
+   "id": "n1",
+   "op": "custom_event",
+   "name": "Place",
+   "params": [
+    {
+     "name": "AddonName",
+     "type": "string"
+    },
+    {
+     "name": "LevelPath",
+     "type": "string"
+    },
+    {
+     "name": "TargetName",
+     "type": "string"
+    },
+    {
+     "name": "Hides",
+     "type": "string"
+    },
+    {
+     "name": "HideLevels",
+     "type": "string"
+    },
+    {
+     "name": "Loc",
+     "type": "vector"
+    },
+    {
+     "name": "Rot",
+     "type": "rotator"
+    },
+    {
+     "name": "Scale",
+     "type": "vector"
+    }
+   ]
+  },
+  {
+   "id": "n2",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "|"
+   }
+  },
+  {
+   "id": "n3",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "B": "|"
+   }
+  },
+  {
+   "id": "n4",
+   "op": "call",
+   "function": "KismetStringLibrary:Contains"
+  },
+  {
+   "id": "n5",
+   "op": "get",
+   "var": "Names"
+  },
+  {
+   "id": "n6",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "|"
+   }
+  },
+  {
+   "id": "n7",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "B": ">"
+   }
+  },
+  {
+   "id": "n8",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr"
+  },
+  {
+   "id": "n9",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "B": "|"
+   }
+  },
+  {
+   "id": "n10",
+   "op": "call",
+   "function": "KismetStringLibrary:Contains"
+  },
+  {
+   "id": "n11",
+   "op": "get",
+   "var": "Keys"
+  },
+  {
+   "id": "n12",
+   "op": "call",
+   "function": "KismetMathLibrary:BooleanOR"
+  },
+  {
+   "id": "n13",
+   "op": "branch"
+  },
+  {
+   "id": "n14",
+   "op": "set",
+   "var": "LastReport",
+   "pins": {
+    "LastReport": "already placed (the same name, or the same level and target as another add-on): ignored"
+   }
+  },
+  {
+   "id": "n15",
+   "op": "call",
+   "function": "KismetMathLibrary:MakeTransform",
+   "pins": {
+    "Scale": "1,1,1"
+   }
+  },
+  {
+   "id": "n16",
+   "op": "node",
+   "class": "K2Node_SpawnActorFromClass",
+   "pins": {
+    "CollisionHandlingOverride": "AlwaysSpawn",
+    "Class": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C"
+   }
+  },
+  {
+   "id": "n17",
+   "op": "cast",
+   "class": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C",
+   "pure": false
+  },
+  {
+   "id": "n18",
+   "op": "set",
+   "var": "AddonName",
+   "class": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C"
+  },
+  {
+   "id": "n19",
+   "op": "set",
+   "var": "LevelPath",
+   "class": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C"
+  },
+  {
+   "id": "n20",
+   "op": "set",
+   "var": "TargetName",
+   "class": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C"
+  },
+  {
+   "id": "n21",
+   "op": "set",
+   "var": "Hides",
+   "class": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C"
+  },
+  {
+   "id": "n22",
+   "op": "set",
+   "var": "HideLevels",
+   "class": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C"
+  },
+  {
+   "id": "n23",
+   "op": "set",
+   "var": "Loc",
+   "class": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C"
+  },
+  {
+   "id": "n24",
+   "op": "set",
+   "var": "Rot",
+   "class": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C"
+  },
+  {
+   "id": "n25",
+   "op": "set",
+   "var": "Scale",
+   "class": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C"
+  },
+  {
+   "id": "n26",
+   "op": "call",
+   "function": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C:Start"
+  },
+  {
+   "id": "n27",
+   "op": "set",
+   "var": "LastReport"
+  },
+  {
+   "id": "n28",
+   "op": "get",
+   "var": "Report",
+   "class": "/Game/Mods/ITRLevelAddons/BP_ITRLevelAddon.BP_ITRLevelAddon_C"
+  },
+  {
+   "id": "n29",
+   "op": "set",
+   "var": "Names"
+  },
+  {
+   "id": "n30",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr"
+  },
+  {
+   "id": "n31",
+   "op": "get",
+   "var": "Names"
+  },
+  {
+   "id": "n32",
+   "op": "set",
+   "var": "Keys"
+  },
+  {
+   "id": "n33",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr"
+  },
+  {
+   "id": "n34",
+   "op": "get",
+   "var": "Keys"
+  }
+ ],
+ "links": [
+  [
+   "n1.AddonName",
+   "n2.B"
+  ],
+  [
+   "n2.ReturnValue",
+   "n3.A"
+  ],
+  [
+   "n5.Names",
+   "n4.SearchIn"
+  ],
+  [
+   "n3.ReturnValue",
+   "n4.Substring"
+  ],
+  [
+   "n1.LevelPath",
+   "n6.B"
+  ],
+  [
+   "n6.ReturnValue",
+   "n7.A"
+  ],
+  [
+   "n7.ReturnValue",
+   "n8.A"
+  ],
+  [
+   "n1.TargetName",
+   "n8.B"
+  ],
+  [
+   "n8.ReturnValue",
+   "n9.A"
+  ],
+  [
+   "n11.Keys",
+   "n10.SearchIn"
+  ],
+  [
+   "n9.ReturnValue",
+   "n10.Substring"
+  ],
+  [
+   "n4.ReturnValue",
+   "n12.A"
+  ],
+  [
+   "n10.ReturnValue",
+   "n12.B"
+  ],
+  [
+   "n12.ReturnValue",
+   "n13.Condition"
+  ],
+  [
+   "n1.then",
+   "n13.execute"
+  ],
+  [
+   "n13.True",
+   "n14.execute"
+  ],
+  [
+   "n15.ReturnValue",
+   "n16.SpawnTransform"
+  ],
+  [
+   "n13.False",
+   "n16.execute"
+  ],
+  [
+   "n16.ReturnValue",
+   "n17.Object"
+  ],
+  [
+   "n16.then",
+   "n17.execute"
+  ],
+  [
+   "n17.as",
+   "n18.self"
+  ],
+  [
+   "n1.AddonName",
+   "n18.AddonName"
+  ],
+  [
+   "n17.then",
+   "n18.execute"
+  ],
+  [
+   "n17.as",
+   "n19.self"
+  ],
+  [
+   "n1.LevelPath",
+   "n19.LevelPath"
+  ],
+  [
+   "n18.then",
+   "n19.execute"
+  ],
+  [
+   "n17.as",
+   "n20.self"
+  ],
+  [
+   "n1.TargetName",
+   "n20.TargetName"
+  ],
+  [
+   "n19.then",
+   "n20.execute"
+  ],
+  [
+   "n17.as",
+   "n21.self"
+  ],
+  [
+   "n1.Hides",
+   "n21.Hides"
+  ],
+  [
+   "n20.then",
+   "n21.execute"
+  ],
+  [
+   "n17.as",
+   "n22.self"
+  ],
+  [
+   "n1.HideLevels",
+   "n22.HideLevels"
+  ],
+  [
+   "n21.then",
+   "n22.execute"
+  ],
+  [
+   "n17.as",
+   "n23.self"
+  ],
+  [
+   "n1.Loc",
+   "n23.Loc"
+  ],
+  [
+   "n22.then",
+   "n23.execute"
+  ],
+  [
+   "n17.as",
+   "n24.self"
+  ],
+  [
+   "n1.Rot",
+   "n24.Rot"
+  ],
+  [
+   "n23.then",
+   "n24.execute"
+  ],
+  [
+   "n17.as",
+   "n25.self"
+  ],
+  [
+   "n1.Scale",
+   "n25.Scale"
+  ],
+  [
+   "n24.then",
+   "n25.execute"
+  ],
+  [
+   "n17.as",
+   "n26.self"
+  ],
+  [
+   "n25.then",
+   "n26.execute"
+  ],
+  [
+   "n17.as",
+   "n28.self"
+  ],
+  [
+   "n28.Report",
+   "n27.LastReport"
+  ],
+  [
+   "n26.then",
+   "n27.execute"
+  ],
+  [
+   "n31.Names",
+   "n30.A"
+  ],
+  [
+   "n3.ReturnValue",
+   "n30.B"
+  ],
+  [
+   "n30.ReturnValue",
+   "n29.Names"
+  ],
+  [
+   "n27.then",
+   "n29.execute"
+  ],
+  [
+   "n34.Keys",
+   "n33.A"
+  ],
+  [
+   "n9.ReturnValue",
+   "n33.B"
+  ],
+  [
+   "n33.ReturnValue",
+   "n32.Keys"
+  ],
+  [
+   "n29.then",
+   "n32.execute"
+  ]
+ ],
+ "requires": [
+  "BP_ITRLevelAddon.json"
+ ]
+}

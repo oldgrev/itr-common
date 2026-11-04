@@ -5,10 +5,12 @@ game, plus the stuff needed along the way.
 
 ![Picking up the sugar cube in the Hub loads the example map through the game's normal level transition](images/loading.gif)
 
-## Example map test
-1. **UE4SS:** Example used was "UE4SS for ITR1" from Nexus Mods for no particular reason
+## Try the example map
+1. **Install UE4SS.** The example was tested with "UE4SS for ITR1" from Nexus Mods
    (https://www.nexusmods.com/intotheradiusvr/mods/359; I used `UE4SS-ITR-359-v3-0-1-321-gc62ada0`).
-   use vortex, or manually as that page describes. I'm not sure if it's the best one to use on nexus mods and if you are sure then you probably don't need to read this bit about how to set it up or add a lua mod. 
+   You can use Vortex or follow that page's manual install instructions. This is the build I happened to use,
+   rather than a recommendation over the other Nexus options. If you already have UE4SS and know how to add Lua
+   mods, you can skip ahead to the loader. For a manual install:
    - `dwmapi.dll` and `override.txt` go into `<game>\IntoTheRadius\Binaries\Win64\`;
    - the **contents** of the zip's `ue4ss\` folder go into `<game>\IntoTheRadius\Content\Paks\`, so that
      `UE4SS.dll` sits directly in `Paks`;
@@ -17,10 +19,10 @@ game, plus the stuff needed along the way.
 
    If the game hangs at startup (no window, about 12 MB of memory), `UE4SS.dll` isn't where `override.txt` points.
    That happens if you copy the `ue4ss` folder itself into `Paks` instead of its contents, as we first did.
-2. **The loader:** copy [`loader-ue4ss/ITRMapLoader`](loader-ue4ss/) into `Content\Paks\LuaMods\`. Its `config.lua` is
-   already set up for the example map; there is nothing to edit.
+2. **The loader:** copy [`loader-ue4ss/ITRMapLoader`](loader-ue4ss/) into `Content\Paks\LuaMods\`. Its `config.lua` has the example map's
+   entry as a commented block: remove the `-- ` in front of it, delete the line `Maps = {},` above it and set `Key = "F10"` (the comments in the file say the same).
 3. **The map:** copy [`example-map/prebuilt/zzz_ITRMap_Example_P.pak`](example-map/prebuilt/) into
-   `<game>\IntoTheRadius\Content\Paks\`. Copy `zzz_ITRMap_Example_Tags_P.pak` from the same folder with it: it registers the
+   `<game>\IntoTheRadius\Content\Paks\~mods\` (create `~mods` if it isn't there). Copy `zzz_ITRMap_Example_Tags_P.pak` from the same folder with it: it registers the
    map's level tag so a save made in the map keeps its level (the example doesn't save in the map by default, but your own maps
    will want it; see "Saving" in the loader README).
 4. **Play:** start the game and Continue into the Hub. Pick up the **sugar cube** (the little item with the mesh
@@ -37,10 +39,10 @@ To undo it all, delete:
 
 Details and troubleshooting: [`loader-ue4ss/README.md`](loader-ue4ss/README.md).
 
-## Make your own
-**Start here: [`map-making/guide.md`](map-making/guide.md)**. It goes from nothing to walking around your own map.
+## Make your own map
+**Start here: [`map-making/guide.md`](map-making/guide.md)**. It walks you through setting up the editor, building a map, and getting it into the game so you can walk around it.
 
-It's long and a pain in the neck because it involves building a specific unreal editor version to be able to make the materials and shaders work. If you're not using new materials then you can probably just use the normal version. Not sure, untested.
+It's long and a pain in the neck because it involves building a specific Unreal Editor version to get materials and shaders working. If you're not using new materials, the normal version might be enough, but that's untested. The guide takes the route we've used.
 
 What's where:
 

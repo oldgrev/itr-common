@@ -98,7 +98,50 @@ do
 end
 do
     local F = Forms.Parse([[{ "schema": 1, "level": "/Game/Mods/A/L_A" }]], "None.json")
-    Case("no triggers: empty lists, no Regions row", F ~= nil and #F.Levels == 0 and #F.Items == 0 and #F.Triggers == 0 and F.Regions == false)
+    Case("no triggers: empty lists, no Regions row", F ~= nil and #F.Levels == 0 and #F.Triggers == 0 and F.Regions == false)
+end
+
+-- exit destinations: "to" and "at"
+do
+    local function X(Extra) return Forms.Parse([==[{ "schema": 1, "level": "/Game/Mods/A/L_A", "triggers": [ { "kind": "exit", "type": "collision", "object": "e1"]==] .. Extra .. " } ] }", "Ex.json") end
+    local F, _, W = X("")
+    Case("exit with no 'to': kept, no destination", F and #F.Exits == 1 and F.Exits[1].To == nil and F.Exits[1].At == nil and #W == 0)
+    local F2, _, W2 = X([[, "to": "OtherMap"]])
+    Case("exit 'to' a map name", F2 and F2.Exits[1].To == "OtherMap" and #W2 == 0)
+    local F3, _, W3 = X([[, "to": "Level.Zone.Buffer", "at": { "kind": "object", "value": "Gate.HubToBuffer" }]])
+    Case("exit 'at' an object (a gate tag)", F3 and F3.Exits[1].To == "Level.Zone.Buffer" and F3.Exits[1].At == "Gate.HubToBuffer" and #W3 == 0)
+    local F4, _, W4 = X([[, "to": "Level.Zone.Buffer", "at": { "kind": "coordinates", "value": [1, -2.5, 3] }]])
+    local A4 = F4 and F4.Exits[1].At
+    Case("exit 'at' coordinates [x, y, z] (yaw defaults to 0)", type(A4) == "table" and A4.X == 1 and A4.Y == -2.5 and A4.Z == 3 and A4.Yaw == 0 and #W4 == 0)
+    local F5 = X([[, "to": "Level.Zone.Buffer", "at": { "kind": "coordinates", "value": [1, 2, 3, 90] }]])
+    Case("exit 'at' coordinates with a yaw", F5 and F5.Exits[1].At.Yaw == 90)
+    local F6, _, W6 = X([[, "to": "Level.Zone.Buffer", "at": [ { "kind": "object", "value": "Gate.A" } ] ]])
+    Case("a one-item list is the same as the object", F6 and F6.Exits[1].At == "Gate.A" and #W6 == 0)
+    local F7, _, W7 = X([[, "to": "Level.Zone.Buffer", "at": [ { "kind": "object", "value": "Gate.A" }, { "kind": "object", "value": "Gate.B" } ] ]])
+    Case("a longer list uses the first and logs it", F7 and F7.Exits[1].At == "Gate.A" and #W7 == 1 and W7[1]:find("only the first is used", 1, true) ~= nil, W7 and W7[1])
+    for _, Bad in ipairs({ [[, "to": "Not A Name"]], [[, "to": 5]], [[, "to": "a.b"]], [[, "to": "Level."]] }) do
+        local FB, _, WB = X(Bad)
+        Case("bad exit 'to' " .. Bad:gsub("^, ", "") .. ": trigger ignored, one line", FB ~= nil and #FB.Exits == 0 and #WB == 1 and WB[1]:find("'to' must be", 1, true) ~= nil, WB and WB[1])
+    end
+    for _, Bad in ipairs({ [[, "at": 5]], [[, "at": "Gate.HubToBuffer"]], [[, "at": { "x": 1, "y": 2, "z": 3 }]], [[, "at": { "kind": "object", "value": "Gate X" }]],
+        [[, "at": { "kind": "coordinates", "value": [1, 2] }]], [[, "at": { "kind": "coordinates", "value": [1, "2", 3] }]], [[, "at": { "kind": "room", "value": "x" }]] }) do
+        local FB, _, WB = X(Bad)
+        Case("bad exit 'at' " .. Bad:gsub("^, ", "") .. ": trigger ignored, one line", FB ~= nil and #FB.Exits == 0 and #WB == 1 and WB[1]:find("'at' must be", 1, true) ~= nil, WB and WB[1])
+    end
+end
+
+-- rifts
+do
+    local function R(Extra) return Forms.Parse([[{ "schema": 1, "level": "/Game/Mods/A/L_A"]] .. Extra .. " }", "Rift.json") end
+    local F, _, W = R("")
+    Case("rifts default to 99", F and F.Rifts == 99 and #W == 0)
+    local F2, _, W2 = R([[, "rifts": 33]])
+    Case("rifts 33 accepted and reach the map record", F2 and F2.Rifts == 33 and #W2 == 0 and Forms.ToMap(F2).NativeGenerators == 33)
+    Case("rifts 0 accepted", (R([[, "rifts": 0]])).Rifts == 0)
+    for _, Bad in ipairs({ [[, "rifts": "many"]], [[, "rifts": -1]], [[, "rifts": 2.5]], [[, "rifts": true]], [==[, "rifts": [1] ]==] }) do
+        local FB, _, WB = R(Bad)
+        Case("bad rifts " .. Bad:gsub("^, ", "") .. ": logged, form kept, default 99", FB ~= nil and FB.Rifts == 99 and #WB == 1 and WB[1]:find("'rifts'", 1, true) ~= nil, WB and WB[1])
+    end
 end
 
 -- enter, saves, return point

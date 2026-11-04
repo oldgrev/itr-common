@@ -1,0 +1,1435 @@
+{
+ "once": false,
+ "_doc": "ITRMapLoader's Regions page on the Hub computer. PageBuilt (from Lua's one Construct hook) shows and renames the stock spare row and binds its press; the press switches the computer to its Tapes page and fills it with one stock row per map; a row's press enters the map (HRowPressed finds the pressed row). OpenList and PressRow are test events. No Tick, no timer.",
+ "asset": "/Game/Mods/ITRMapLoader/BP_ITRRegions",
+ "parent": "/Script/Engine.Actor",
+ "components": [],
+ "variables": [
+  {
+   "name": "Computer",
+   "type": "object:/Script/Engine.Actor"
+  },
+  {
+   "name": "Wc",
+   "type": "object:/Script/UMG.WidgetComponent"
+  },
+  {
+   "name": "TapesWc",
+   "type": "object:/Script/UMG.WidgetComponent"
+  },
+  {
+   "name": "BoundBtn",
+   "type": "object:/Script/UMG.Button"
+  },
+  {
+   "name": "Rows",
+   "type": "string",
+   "default": "",
+   "tooltip": "<MapName> US <row text> RS ..., written by Lua at the one step"
+  },
+  {
+   "name": "RowButtons",
+   "type": "object:/Script/UMG.Button[]"
+  },
+  {
+   "name": "RowNames",
+   "type": "string[]"
+  }
+ ],
+ "cdo": {
+  "PrimaryActorTick": "(bCanEverTick=False)"
+ },
+ "nodes": [
+  {
+   "id": "n1",
+   "op": "custom_event",
+   "name": "PageBuilt",
+   "params": [
+    {
+     "name": "Btn",
+     "type": "object:/Script/UMG.Button"
+    },
+    {
+     "name": "Txt",
+     "type": "object:/Script/UMG.TextBlock"
+    },
+    {
+     "name": "WcIn",
+     "type": "object:/Script/UMG.WidgetComponent"
+    }
+   ]
+  },
+  {
+   "id": "n2",
+   "op": "set",
+   "var": "Wc"
+  },
+  {
+   "id": "n3",
+   "op": "call",
+   "function": "ActorComponent:GetOwner"
+  },
+  {
+   "id": "n4",
+   "op": "set",
+   "var": "Computer"
+  },
+  {
+   "id": "n5",
+   "op": "call",
+   "function": "Widget:SetVisibility",
+   "pins": {
+    "InVisibility": "Visible"
+   }
+  },
+  {
+   "id": "n6",
+   "op": "call",
+   "function": "KismetTextLibrary:Conv_StringToText",
+   "pins": {
+    "InString": "REGIONS"
+   }
+  },
+  {
+   "id": "n7",
+   "op": "call",
+   "function": "TextBlock:SetText"
+  },
+  {
+   "id": "n8",
+   "op": "call",
+   "function": "WidgetComponent:RequestRenderUpdate"
+  },
+  {
+   "id": "n9",
+   "op": "call",
+   "function": "ReleaseHeld"
+  },
+  {
+   "id": "n10",
+   "op": "self"
+  },
+  {
+   "id": "n11",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "itrmaps log regions: ",
+    "B": "page built: the REGIONS row is shown, a held laser press is released"
+   }
+  },
+  {
+   "id": "n12",
+   "op": "call",
+   "function": "KismetSystemLibrary:ExecuteConsoleCommand"
+  },
+  {
+   "id": "n13",
+   "op": "self"
+  },
+  {
+   "id": "n14",
+   "op": "call",
+   "function": "KismetMathLibrary:EqualEqual_ObjectObject"
+  },
+  {
+   "id": "n15",
+   "op": "get",
+   "var": "BoundBtn"
+  },
+  {
+   "id": "n16",
+   "op": "call",
+   "function": "KismetMathLibrary:Not_PreBool"
+  },
+  {
+   "id": "n17",
+   "op": "branch"
+  },
+  {
+   "id": "n18",
+   "op": "set",
+   "var": "BoundBtn"
+  },
+  {
+   "id": "n19",
+   "op": "create_delegate",
+   "function": "HLog"
+  },
+  {
+   "id": "n20",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/UMG.Button',MemberName=\"OnPressed\")"
+   }
+  },
+  {
+   "id": "n21",
+   "op": "custom_event",
+   "name": "ReleaseHeld"
+  },
+  {
+   "id": "n22",
+   "op": "call",
+   "function": "GameplayStatics:GetPlayerPawn",
+   "pins": {
+    "PlayerIndex": 0
+   }
+  },
+  {
+   "id": "n23",
+   "op": "self"
+  },
+  {
+   "id": "n24",
+   "op": "call",
+   "function": "Actor:K2_GetComponentsByClass",
+   "pins": {
+    "ComponentClass": "/Script/UMG.WidgetInteractionComponent"
+   }
+  },
+  {
+   "id": "n25",
+   "op": "macro",
+   "macro": "ForEachLoop"
+  },
+  {
+   "id": "n26",
+   "op": "cast",
+   "class": "/Script/UMG.WidgetInteractionComponent",
+   "pure": false
+  },
+  {
+   "id": "n27",
+   "op": "call",
+   "function": "WidgetInteractionComponent:ReleasePointerKey",
+   "pins": {
+    "Key": "LeftMouseButton"
+   }
+  },
+  {
+   "id": "n28",
+   "op": "custom_event",
+   "name": "HLog"
+  },
+  {
+   "id": "n29",
+   "op": "call",
+   "function": "SwitchPage"
+  },
+  {
+   "id": "n30",
+   "op": "self"
+  },
+  {
+   "id": "n31",
+   "op": "custom_event",
+   "name": "SwitchPage"
+  },
+  {
+   "id": "n32",
+   "op": "call",
+   "function": "Actor:K2_GetComponentsByClass",
+   "pins": {
+    "ComponentClass": "/Script/UMG.WidgetComponent"
+   }
+  },
+  {
+   "id": "n33",
+   "op": "get",
+   "var": "Computer"
+  },
+  {
+   "id": "n34",
+   "op": "macro",
+   "macro": "ForEachLoop"
+  },
+  {
+   "id": "n35",
+   "op": "cast",
+   "class": "/Script/UMG.WidgetComponent",
+   "pure": false
+  },
+  {
+   "id": "n36",
+   "op": "call",
+   "function": "KismetSystemLibrary:GetObjectName"
+  },
+  {
+   "id": "n37",
+   "op": "call",
+   "function": "KismetStringLibrary:StartsWith",
+   "pins": {
+    "InPrefix": "WC_Page_"
+   }
+  },
+  {
+   "id": "n38",
+   "op": "call",
+   "function": "KismetStringLibrary:Contains",
+   "pins": {
+    "Substring": "Background"
+   }
+  },
+  {
+   "id": "n39",
+   "op": "call",
+   "function": "KismetMathLibrary:Not_PreBool"
+  },
+  {
+   "id": "n40",
+   "op": "call",
+   "function": "KismetMathLibrary:BooleanAND"
+  },
+  {
+   "id": "n41",
+   "op": "branch"
+  },
+  {
+   "id": "n42",
+   "op": "call",
+   "function": "SceneComponent:SetHiddenInGame",
+   "pins": {
+    "NewHidden": true,
+    "bPropagateToChildren": false
+   }
+  },
+  {
+   "id": "n43",
+   "op": "call",
+   "function": "PrimitiveComponent:SetCollisionEnabled",
+   "pins": {
+    "NewType": "NoCollision"
+   }
+  },
+  {
+   "id": "n44",
+   "op": "call",
+   "function": "KismetStringLibrary:Contains",
+   "pins": {
+    "Substring": "Tapes"
+   }
+  },
+  {
+   "id": "n45",
+   "op": "branch"
+  },
+  {
+   "id": "n46",
+   "op": "call",
+   "function": "SceneComponent:SetHiddenInGame",
+   "pins": {
+    "NewHidden": false,
+    "bPropagateToChildren": false
+   }
+  },
+  {
+   "id": "n47",
+   "op": "call",
+   "function": "PrimitiveComponent:SetCollisionEnabled",
+   "pins": {
+    "NewType": "QueryOnly"
+   }
+  },
+  {
+   "id": "n48",
+   "op": "set",
+   "var": "TapesWc"
+  },
+  {
+   "id": "n49",
+   "op": "call",
+   "function": "FillRows"
+  },
+  {
+   "id": "n50",
+   "op": "self"
+  },
+  {
+   "id": "n51",
+   "op": "custom_event",
+   "name": "FillRows"
+  },
+  {
+   "id": "n52",
+   "op": "call",
+   "function": "WidgetComponent:GetUserWidgetObject"
+  },
+  {
+   "id": "n53",
+   "op": "get",
+   "var": "TapesWc"
+  },
+  {
+   "id": "n54",
+   "op": "cast",
+   "class": "/Game/ITR/BPs/UI/ComputersPages/WBP_MCPage_Tapes.WBP_MCPage_Tapes_C",
+   "pure": false
+  },
+  {
+   "id": "n55",
+   "op": "get",
+   "var": "SB_Tapes",
+   "class": "/Game/ITR/BPs/UI/ComputersPages/WBP_MCPage_Tapes.WBP_MCPage_Tapes_C"
+  },
+  {
+   "id": "n56",
+   "op": "call",
+   "function": "PanelWidget:ClearChildren"
+  },
+  {
+   "id": "n57",
+   "op": "call",
+   "function": "KismetArrayLibrary:Array_Clear"
+  },
+  {
+   "id": "n58",
+   "op": "get",
+   "var": "RowButtons"
+  },
+  {
+   "id": "n59",
+   "op": "call",
+   "function": "KismetArrayLibrary:Array_Clear"
+  },
+  {
+   "id": "n60",
+   "op": "get",
+   "var": "RowNames"
+  },
+  {
+   "id": "n61",
+   "op": "call",
+   "function": "KismetStringLibrary:ParseIntoArray",
+   "pins": {
+    "Delimiter": "\u001e",
+    "CullEmptyStrings": true
+   }
+  },
+  {
+   "id": "n62",
+   "op": "get",
+   "var": "Rows"
+  },
+  {
+   "id": "n63",
+   "op": "macro",
+   "macro": "ForEachLoop"
+  },
+  {
+   "id": "n64",
+   "op": "call",
+   "function": "MakeRow"
+  },
+  {
+   "id": "n65",
+   "op": "self"
+  },
+  {
+   "id": "n66",
+   "op": "call",
+   "function": "KismetArrayLibrary:Array_Length"
+  },
+  {
+   "id": "n67",
+   "op": "get",
+   "var": "RowNames"
+  },
+  {
+   "id": "n68",
+   "op": "call",
+   "function": "KismetStringLibrary:Conv_IntToString"
+  },
+  {
+   "id": "n69",
+   "op": "call",
+   "function": "WidgetComponent:RequestRenderUpdate"
+  },
+  {
+   "id": "n70",
+   "op": "get",
+   "var": "TapesWc"
+  },
+  {
+   "id": "n71",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "itrmaps log regions: ",
+    "B": "page opened: rows "
+   }
+  },
+  {
+   "id": "n72",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr"
+  },
+  {
+   "id": "n73",
+   "op": "call",
+   "function": "KismetSystemLibrary:ExecuteConsoleCommand"
+  },
+  {
+   "id": "n74",
+   "op": "self"
+  },
+  {
+   "id": "n75",
+   "op": "call",
+   "function": "SceneComponent:IsVisible"
+  },
+  {
+   "id": "n76",
+   "op": "get",
+   "var": "Wc"
+  },
+  {
+   "id": "n77",
+   "op": "call",
+   "function": "KismetStringLibrary:Conv_BoolToString"
+  },
+  {
+   "id": "n78",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "itrmaps log regions: ",
+    "B": "main page visible after the switch: "
+   }
+  },
+  {
+   "id": "n79",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr"
+  },
+  {
+   "id": "n80",
+   "op": "call",
+   "function": "KismetSystemLibrary:ExecuteConsoleCommand"
+  },
+  {
+   "id": "n81",
+   "op": "self"
+  },
+  {
+   "id": "n82",
+   "op": "custom_event",
+   "name": "MakeRow",
+   "params": [
+    {
+     "name": "Rec",
+     "type": "string"
+    }
+   ]
+  },
+  {
+   "id": "n83",
+   "op": "call",
+   "function": "KismetStringLibrary:ParseIntoArray",
+   "pins": {
+    "Delimiter": "\u001f",
+    "CullEmptyStrings": false
+   }
+  },
+  {
+   "id": "n84",
+   "op": "call",
+   "function": "KismetArrayLibrary:Array_Get",
+   "pins": {
+    "Index": 0
+   }
+  },
+  {
+   "id": "n85",
+   "op": "call",
+   "function": "KismetArrayLibrary:Array_Get",
+   "pins": {
+    "Index": 1
+   }
+  },
+  {
+   "id": "n86",
+   "op": "call",
+   "function": "WidgetBlueprintLibrary:Create",
+   "pins": {
+    "WidgetType": "/Game/ITR/BPs/UI/PagesElements/WBP_Element_TapeRecord.WBP_Element_TapeRecord_C"
+   }
+  },
+  {
+   "id": "n87",
+   "op": "self"
+  },
+  {
+   "id": "n88",
+   "op": "call",
+   "function": "GameplayStatics:GetPlayerController",
+   "pins": {
+    "PlayerIndex": 0
+   }
+  },
+  {
+   "id": "n89",
+   "op": "self"
+  },
+  {
+   "id": "n90",
+   "op": "cast",
+   "class": "/Game/ITR/BPs/UI/PagesElements/WBP_Element_TapeRecord.WBP_Element_TapeRecord_C",
+   "pure": false
+  },
+  {
+   "id": "n91",
+   "op": "get",
+   "var": "Text_RecordName",
+   "class": "/Game/ITR/BPs/UI/PagesElements/WBP_Element_TapeRecord.WBP_Element_TapeRecord_C"
+  },
+  {
+   "id": "n92",
+   "op": "call",
+   "function": "KismetTextLibrary:Conv_StringToText"
+  },
+  {
+   "id": "n93",
+   "op": "call",
+   "function": "TextBlock:SetText"
+  },
+  {
+   "id": "n94",
+   "op": "get",
+   "var": "Button_TapeRecord",
+   "class": "/Game/ITR/BPs/UI/PagesElements/WBP_Element_TapeRecord.WBP_Element_TapeRecord_C"
+  },
+  {
+   "id": "n95",
+   "op": "call",
+   "function": "KismetArrayLibrary:Array_Add"
+  },
+  {
+   "id": "n96",
+   "op": "get",
+   "var": "RowButtons"
+  },
+  {
+   "id": "n97",
+   "op": "call",
+   "function": "KismetArrayLibrary:Array_Add"
+  },
+  {
+   "id": "n98",
+   "op": "get",
+   "var": "RowNames"
+  },
+  {
+   "id": "n99",
+   "op": "create_delegate",
+   "function": "HRowPressed"
+  },
+  {
+   "id": "n100",
+   "op": "node",
+   "class": "K2Node_AddDelegate",
+   "props": {
+    "DelegateReference": "(MemberParent=Class'/Script/UMG.Button',MemberName=\"OnPressed\")"
+   }
+  },
+  {
+   "id": "n101",
+   "op": "get",
+   "var": "SB_Tapes",
+   "class": "/Game/ITR/BPs/UI/ComputersPages/WBP_MCPage_Tapes.WBP_MCPage_Tapes_C"
+  },
+  {
+   "id": "n102",
+   "op": "cast",
+   "class": "/Game/ITR/BPs/UI/ComputersPages/WBP_MCPage_Tapes.WBP_MCPage_Tapes_C",
+   "pure": false
+  },
+  {
+   "id": "n103",
+   "op": "call",
+   "function": "WidgetComponent:GetUserWidgetObject"
+  },
+  {
+   "id": "n104",
+   "op": "get",
+   "var": "TapesWc"
+  },
+  {
+   "id": "n105",
+   "op": "call",
+   "function": "PanelWidget:AddChild"
+  },
+  {
+   "id": "n106",
+   "op": "custom_event",
+   "name": "HRowPressed"
+  },
+  {
+   "id": "n107",
+   "op": "macro",
+   "macro": "ForEachLoop"
+  },
+  {
+   "id": "n108",
+   "op": "get",
+   "var": "RowButtons"
+  },
+  {
+   "id": "n109",
+   "op": "call",
+   "function": "Button:IsPressed"
+  },
+  {
+   "id": "n110",
+   "op": "branch"
+  },
+  {
+   "id": "n111",
+   "op": "call",
+   "function": "KismetArrayLibrary:Array_Get"
+  },
+  {
+   "id": "n112",
+   "op": "get",
+   "var": "RowNames"
+  },
+  {
+   "id": "n113",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr",
+   "pins": {
+    "A": "itrmaps log regions: ",
+    "B": "row pressed: "
+   }
+  },
+  {
+   "id": "n114",
+   "op": "call",
+   "function": "KismetStringLibrary:Concat_StrStr"
+  },
+  {
+   "id": "n115",
+   "op": "call",
+   "function": "KismetSystemLibrary:ExecuteConsoleCommand"
+  },
+  {
+   "id": "n116",
+   "op": "self"
+  },
+  {
+   "id": "n117",
+   "op": "call",
+   "function": "PressRow"
+  },
+  {
+   "id": "n118",
+   "op": "self"
+  },
+  {
+   "id": "n119",
+   "op": "custom_event",
+   "name": "OpenList"
+  },
+  {
+   "id": "n120",
+   "op": "call",
+   "function": "SwitchPage"
+  },
+  {
+   "id": "n121",
+   "op": "self"
+  },
+  {
+   "id": "n122",
+   "op": "custom_event",
+   "name": "PressRow",
+   "params": [
+    {
+     "name": "Name",
+     "type": "string"
+    }
+   ]
+  },
+  {
+   "id": "n123",
+   "op": "call",
+   "function": "GameplayStatics:GetAllActorsOfClass",
+   "pins": {
+    "ActorClass": "/Game/Mods/ITRMapLoader/BP_ITRMapEntry.BP_ITRMapEntry_C"
+   }
+  },
+  {
+   "id": "n124",
+   "op": "self"
+  },
+  {
+   "id": "n125",
+   "op": "macro",
+   "macro": "ForEachLoop"
+  },
+  {
+   "id": "n126",
+   "op": "cast",
+   "class": "/Game/Mods/ITRMapLoader/BP_ITRMapEntry.BP_ITRMapEntry_C",
+   "pure": false
+  },
+  {
+   "id": "n127",
+   "op": "get",
+   "var": "MapName",
+   "class": "/Game/Mods/ITRMapLoader/BP_ITRMapEntry.BP_ITRMapEntry_C"
+  },
+  {
+   "id": "n128",
+   "op": "call",
+   "function": "KismetStringLibrary:EqualEqual_StriStri"
+  },
+  {
+   "id": "n129",
+   "op": "branch"
+  },
+  {
+   "id": "n130",
+   "op": "call",
+   "function": "/Game/Mods/ITRMapLoader/BP_ITRMapEntry.BP_ITRMapEntry_C:Enter"
+  }
+ ],
+ "links": [
+  [
+   "n1.WcIn",
+   "n2.Wc"
+  ],
+  [
+   "n1.WcIn",
+   "n3.self"
+  ],
+  [
+   "n3.ReturnValue",
+   "n4.Computer"
+  ],
+  [
+   "n1.Btn",
+   "n5.self"
+  ],
+  [
+   "n1.Txt",
+   "n7.self"
+  ],
+  [
+   "n6.ReturnValue",
+   "n7.InText"
+  ],
+  [
+   "n1.WcIn",
+   "n8.self"
+  ],
+  [
+   "n10.self",
+   "n9.self"
+  ],
+  [
+   "n1.then",
+   "n2.execute"
+  ],
+  [
+   "n2.then",
+   "n4.execute"
+  ],
+  [
+   "n4.then",
+   "n5.execute"
+  ],
+  [
+   "n5.then",
+   "n7.execute"
+  ],
+  [
+   "n7.then",
+   "n8.execute"
+  ],
+  [
+   "n8.then",
+   "n9.execute"
+  ],
+  [
+   "n11.ReturnValue",
+   "n12.Command"
+  ],
+  [
+   "n13.self",
+   "n12.WorldContextObject"
+  ],
+  [
+   "n9.then",
+   "n12.execute"
+  ],
+  [
+   "n1.Btn",
+   "n14.A"
+  ],
+  [
+   "n15.BoundBtn",
+   "n14.B"
+  ],
+  [
+   "n14.ReturnValue",
+   "n16.A"
+  ],
+  [
+   "n16.ReturnValue",
+   "n17.Condition"
+  ],
+  [
+   "n12.then",
+   "n17.execute"
+  ],
+  [
+   "n1.Btn",
+   "n18.BoundBtn"
+  ],
+  [
+   "n17.True",
+   "n18.execute"
+  ],
+  [
+   "n1.Btn",
+   "n20.self"
+  ],
+  [
+   "n19.OutputDelegate",
+   "n20.delegate"
+  ],
+  [
+   "n18.then",
+   "n20.execute"
+  ],
+  [
+   "n23.self",
+   "n22.WorldContextObject"
+  ],
+  [
+   "n22.ReturnValue",
+   "n24.self"
+  ],
+  [
+   "n24.ReturnValue",
+   "n25.Array"
+  ],
+  [
+   "n21.then",
+   "n25.Exec"
+  ],
+  [
+   "n25.ArrayElement",
+   "n26.Object"
+  ],
+  [
+   "n25.LoopBody",
+   "n26.execute"
+  ],
+  [
+   "n26.as",
+   "n27.self"
+  ],
+  [
+   "n26.then",
+   "n27.execute"
+  ],
+  [
+   "n30.self",
+   "n29.self"
+  ],
+  [
+   "n28.then",
+   "n29.execute"
+  ],
+  [
+   "n33.Computer",
+   "n32.self"
+  ],
+  [
+   "n32.ReturnValue",
+   "n34.Array"
+  ],
+  [
+   "n31.then",
+   "n34.Exec"
+  ],
+  [
+   "n34.ArrayElement",
+   "n35.Object"
+  ],
+  [
+   "n34.LoopBody",
+   "n35.execute"
+  ],
+  [
+   "n35.as",
+   "n36.Object"
+  ],
+  [
+   "n36.ReturnValue",
+   "n37.SourceString"
+  ],
+  [
+   "n36.ReturnValue",
+   "n38.SearchIn"
+  ],
+  [
+   "n38.ReturnValue",
+   "n39.A"
+  ],
+  [
+   "n37.ReturnValue",
+   "n40.A"
+  ],
+  [
+   "n39.ReturnValue",
+   "n40.B"
+  ],
+  [
+   "n40.ReturnValue",
+   "n41.Condition"
+  ],
+  [
+   "n35.then",
+   "n41.execute"
+  ],
+  [
+   "n35.as",
+   "n42.self"
+  ],
+  [
+   "n41.True",
+   "n42.execute"
+  ],
+  [
+   "n35.as",
+   "n43.self"
+  ],
+  [
+   "n42.then",
+   "n43.execute"
+  ],
+  [
+   "n36.ReturnValue",
+   "n44.SearchIn"
+  ],
+  [
+   "n44.ReturnValue",
+   "n45.Condition"
+  ],
+  [
+   "n43.then",
+   "n45.execute"
+  ],
+  [
+   "n35.as",
+   "n46.self"
+  ],
+  [
+   "n45.True",
+   "n46.execute"
+  ],
+  [
+   "n35.as",
+   "n47.self"
+  ],
+  [
+   "n46.then",
+   "n47.execute"
+  ],
+  [
+   "n35.as",
+   "n48.TapesWc"
+  ],
+  [
+   "n47.then",
+   "n48.execute"
+  ],
+  [
+   "n50.self",
+   "n49.self"
+  ],
+  [
+   "n34.Completed",
+   "n49.execute"
+  ],
+  [
+   "n53.TapesWc",
+   "n52.self"
+  ],
+  [
+   "n52.ReturnValue",
+   "n54.Object"
+  ],
+  [
+   "n51.then",
+   "n54.execute"
+  ],
+  [
+   "n54.as",
+   "n55.self"
+  ],
+  [
+   "n55.SB_Tapes",
+   "n56.self"
+  ],
+  [
+   "n54.then",
+   "n56.execute"
+  ],
+  [
+   "n58.RowButtons",
+   "n57.TargetArray"
+  ],
+  [
+   "n56.then",
+   "n57.execute"
+  ],
+  [
+   "n60.RowNames",
+   "n59.TargetArray"
+  ],
+  [
+   "n57.then",
+   "n59.execute"
+  ],
+  [
+   "n62.Rows",
+   "n61.SourceString"
+  ],
+  [
+   "n61.ReturnValue",
+   "n63.Array"
+  ],
+  [
+   "n59.then",
+   "n63.Exec"
+  ],
+  [
+   "n65.self",
+   "n64.self"
+  ],
+  [
+   "n63.ArrayElement",
+   "n64.Rec"
+  ],
+  [
+   "n63.LoopBody",
+   "n64.execute"
+  ],
+  [
+   "n67.RowNames",
+   "n66.TargetArray"
+  ],
+  [
+   "n66.ReturnValue",
+   "n68.InInt"
+  ],
+  [
+   "n70.TapesWc",
+   "n69.self"
+  ],
+  [
+   "n63.Completed",
+   "n69.execute"
+  ],
+  [
+   "n71.ReturnValue",
+   "n72.A"
+  ],
+  [
+   "n68.ReturnValue",
+   "n72.B"
+  ],
+  [
+   "n72.ReturnValue",
+   "n73.Command"
+  ],
+  [
+   "n74.self",
+   "n73.WorldContextObject"
+  ],
+  [
+   "n69.then",
+   "n73.execute"
+  ],
+  [
+   "n76.Wc",
+   "n75.self"
+  ],
+  [
+   "n75.ReturnValue",
+   "n77.InBool"
+  ],
+  [
+   "n78.ReturnValue",
+   "n79.A"
+  ],
+  [
+   "n77.ReturnValue",
+   "n79.B"
+  ],
+  [
+   "n79.ReturnValue",
+   "n80.Command"
+  ],
+  [
+   "n81.self",
+   "n80.WorldContextObject"
+  ],
+  [
+   "n73.then",
+   "n80.execute"
+  ],
+  [
+   "n82.Rec",
+   "n83.SourceString"
+  ],
+  [
+   "n83.ReturnValue",
+   "n84.TargetArray"
+  ],
+  [
+   "n83.ReturnValue",
+   "n85.TargetArray"
+  ],
+  [
+   "n87.self",
+   "n86.WorldContextObject"
+  ],
+  [
+   "n89.self",
+   "n88.WorldContextObject"
+  ],
+  [
+   "n88.ReturnValue",
+   "n86.OwningPlayer"
+  ],
+  [
+   "n86.ReturnValue",
+   "n90.Object"
+  ],
+  [
+   "n82.then",
+   "n86.execute"
+  ],
+  [
+   "n86.then",
+   "n90.execute"
+  ],
+  [
+   "n90.as",
+   "n91.self"
+  ],
+  [
+   "n85.Item",
+   "n92.InString"
+  ],
+  [
+   "n91.Text_RecordName",
+   "n93.self"
+  ],
+  [
+   "n92.ReturnValue",
+   "n93.InText"
+  ],
+  [
+   "n90.then",
+   "n93.execute"
+  ],
+  [
+   "n90.as",
+   "n94.self"
+  ],
+  [
+   "n96.RowButtons",
+   "n95.TargetArray"
+  ],
+  [
+   "n94.Button_TapeRecord",
+   "n95.NewItem"
+  ],
+  [
+   "n93.then",
+   "n95.execute"
+  ],
+  [
+   "n98.RowNames",
+   "n97.TargetArray"
+  ],
+  [
+   "n84.Item",
+   "n97.NewItem"
+  ],
+  [
+   "n95.then",
+   "n97.execute"
+  ],
+  [
+   "n94.Button_TapeRecord",
+   "n100.self"
+  ],
+  [
+   "n99.OutputDelegate",
+   "n100.delegate"
+  ],
+  [
+   "n97.then",
+   "n100.execute"
+  ],
+  [
+   "n104.TapesWc",
+   "n103.self"
+  ],
+  [
+   "n103.ReturnValue",
+   "n102.Object"
+  ],
+  [
+   "n100.then",
+   "n102.execute"
+  ],
+  [
+   "n102.as",
+   "n101.self"
+  ],
+  [
+   "n101.SB_Tapes",
+   "n105.self"
+  ],
+  [
+   "n86.ReturnValue",
+   "n105.Content"
+  ],
+  [
+   "n102.then",
+   "n105.execute"
+  ],
+  [
+   "n108.RowButtons",
+   "n107.Array"
+  ],
+  [
+   "n106.then",
+   "n107.Exec"
+  ],
+  [
+   "n107.ArrayElement",
+   "n109.self"
+  ],
+  [
+   "n109.ReturnValue",
+   "n110.Condition"
+  ],
+  [
+   "n107.LoopBody",
+   "n110.execute"
+  ],
+  [
+   "n112.RowNames",
+   "n111.TargetArray"
+  ],
+  [
+   "n107.ArrayIndex",
+   "n111.Index"
+  ],
+  [
+   "n113.ReturnValue",
+   "n114.A"
+  ],
+  [
+   "n111.Item",
+   "n114.B"
+  ],
+  [
+   "n114.ReturnValue",
+   "n115.Command"
+  ],
+  [
+   "n116.self",
+   "n115.WorldContextObject"
+  ],
+  [
+   "n110.True",
+   "n115.execute"
+  ],
+  [
+   "n118.self",
+   "n117.self"
+  ],
+  [
+   "n111.Item",
+   "n117.Name"
+  ],
+  [
+   "n115.then",
+   "n117.execute"
+  ],
+  [
+   "n121.self",
+   "n120.self"
+  ],
+  [
+   "n119.then",
+   "n120.execute"
+  ],
+  [
+   "n124.self",
+   "n123.WorldContextObject"
+  ],
+  [
+   "n123.OutActors",
+   "n125.Array"
+  ],
+  [
+   "n122.then",
+   "n123.execute"
+  ],
+  [
+   "n123.then",
+   "n125.Exec"
+  ],
+  [
+   "n125.ArrayElement",
+   "n126.Object"
+  ],
+  [
+   "n125.LoopBody",
+   "n126.execute"
+  ],
+  [
+   "n126.as",
+   "n127.self"
+  ],
+  [
+   "n127.MapName",
+   "n128.A"
+  ],
+  [
+   "n122.Name",
+   "n128.B"
+  ],
+  [
+   "n128.ReturnValue",
+   "n129.Condition"
+  ],
+  [
+   "n126.then",
+   "n129.execute"
+  ],
+  [
+   "n126.as",
+   "n130.self"
+  ],
+  [
+   "n129.True",
+   "n130.execute"
+  ]
+ ],
+ "requires": [
+  "BP_ITRMapEntry.json"
+ ]
+}

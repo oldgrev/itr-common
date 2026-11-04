@@ -52,8 +52,10 @@ Write-Host "Packed $($files.Count) files -> $Pak"
 
 if ($Install) {
     if (Get-Process "IntoTheRadius-Win64-Shipping" -ErrorAction SilentlyContinue) { throw "Close the game first (paks are mounted at startup)." }
-    Copy-Item $Pak (Join-Path $GameDir "IntoTheRadius\Content\Paks") -Force
-    Write-Host "Installed -> $GameDir\IntoTheRadius\Content\Paks\$PakName"
-    Copy-Item (Join-Path $OutDir "zzz_ITRMap_$($Map)_Tags_P.pak") (Join-Path $GameDir "IntoTheRadius\Content\Paks") -Force
-    Write-Host "Installed -> $GameDir\IntoTheRadius\Content\Paks\zzz_ITRMap_$($Map)_Tags_P.pak"
+    $Mods = Join-Path $GameDir "IntoTheRadius\Content\Paks\~mods"
+    New-Item -ItemType Directory -Force $Mods | Out-Null
+    Copy-Item $Pak $Mods -Force
+    Write-Host "Installed -> $Mods\$PakName"
+    Copy-Item (Join-Path $OutDir "zzz_ITRMap_$($Map)_Tags_P.pak") $Mods -Force
+    Write-Host "Installed -> $Mods\zzz_ITRMap_$($Map)_Tags_P.pak"
 }

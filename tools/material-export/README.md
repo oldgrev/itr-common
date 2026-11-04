@@ -1,21 +1,24 @@
 # material-export
 
-Reads a cooked **Into the Radius 1 (2.7.2)** material or material instance out of the game's files and writes down
-what's in it as JSON: parent, parameters, static switches, base property overrides, and what each texture needs
-(compression, sRGB). An Unreal editor script then rebuilds the instance in your project from that JSON.
+This tool copies material settings from **Into the Radius 1 (2.7.2)** into a form you can use in your own editor
+project. It reads the game's cooked files (the packaged versions of its assets) and exports JSON containing the
+parent, parameters, static switches, base property overrides and texture settings such as compression and sRGB.
+An Unreal editor script then uses that JSON to rebuild the material instance in your project.
 
 Use it when you want a game material in your map but the ITR-SDK's copy is missing, stale or has its parameters
 stripped, or you want to see exactly what a material instance sets.
 
-**What you do and don't get.** A cooked master material has no expression graph left in it; the cooker strips it.
-So you get a master's *settings and parameters* (names, defaults, textures), not its shader logic. For a
-material instance you get everything the instance sets. That means:
-- instance whose master you already have in the project (from the ITR-SDK, or your own): the rebuilt instance has the
-  game's values on top of your master;
-- no master available: the script builds a **stand-in master** with the same parameter names and defaults. It
-  has the right *inputs* but renders nothing like the original. Fine to hold instances, not to look at.
+There's one important catch: cooking strips the expression graph from a master material. That graph is the logic
+that gives the material its appearance, and this tool can't bring it back. It can recover the master's settings and
+parameters (names, defaults and textures), along with everything a material instance sets.
+
+What you can do with that depends on whether you already have the master:
+- **You have the master**, from the ITR-SDK or your own work: the rebuilt instance uses the game's values with that master.
+- **You don't have the master:** the script creates a **stand-in master** with the same parameter names and defaults.
+  This gives the instances somewhere to store their values, but it won't look like the original material.
 
 ## Files
+
 | File | What it is | Needs |
 |---|---|---|
 | [`material_export.py`](material_export.py) | `export` / `list` / `show` for cooked packages | Python 3.8+, nothing else |
@@ -25,7 +28,10 @@ material instance you get everything the instance sets. That means:
 | [`compare_editor_copy.py`](compare_editor_copy.py) | Checks an export against an editor copy of the same asset, e.g. the SDK's | [UAssetGUI](https://github.com/atenfyr/UAssetGUI) |
 
 ## Use
-Unpack the game's paks yourself first (`repak unpack` or UnrealPak; this repo doesn't include any game data), so you have
+
+### 1. Export the settings
+
+First, unpack the game's paks (`repak unpack` or UnrealPak; this repo doesn't include any game data), so you have
 a folder like `<unpacked>\IntoTheRadius\Content\...` holding `.uasset` + `.uexp` files.
 
 ```bat
@@ -47,31 +53,46 @@ Each JSON has `parent`, `parameters` (scalar / vector / texture, with associatio
 and with `--chain`: `chain` (every parent up to the master) and `effective` (the values after inheritance).
 With `--textures`: `textureSettings`. The format is `"itr-material-export"`, version 1.
 
-In the editor (Output Log console, or File > Execute Python Script with the options at the top of the file set):
+### 2. Rebuild the assets in the editor
+
+Run this in the editor's Output Log console. You can also use File > Execute Python Script after setting the options
+at the top of the script:
 ```
 py "C:/path/material_import_ue.py" "C:/path/exports" --dest /Game/Recreated
 ```
-Options: `--fallback-parent /Game/MyMaster` (used when the parent isn't in the project and the chain isn't exported),
-`--no-stubs`, `--no-placeholders`, `--overwrite`, `--no-save`. Assets go under `--dest`, not at the game's paths,
-because an asset at the game's path inside a pak would shadow the game's original. A report of what was created,
-skipped, or couldn't be set goes to `<project>\Saved\matexport_report.json`.
+Use `--fallback-parent /Game/MyMaster` if the parent is missing from your project and you haven't exported its chain.
+Other options are `--no-stubs`, `--no-placeholders`, `--overwrite` and `--no-save`.
 
-Check the result (fresh editor session, so it reads the saved files):
+Assets are created under `--dest`. Keeping them away from the game's original paths matters: an asset packed at one
+of those paths would replace the original when the game loads it.
+
+You'll find a report at `<project>\Saved\matexport_report.json` listing what was created, skipped or couldn't be set.
+
+### 3. Check the saved result
+
+Restart the editor before this check, so it reads the files from disk rather than the assets still in memory:
 ```
 py "C:/path/verify_in_editor.py" "C:/path/exports" --dest /Game/Recreated
 ```
-Needs for the **static switches**: our engine patch's `MaterialEditingLibrary.SetMaterialInstanceStaticSwitchParameterValue`
-(see [the guide](../../map-making/guide.md) §3). Stock 4.27 can read switches from Python but not set them. Without
-the patch they come out in the report and you set them by hand. Careful calling it yourself: the parameter must be declared
-by the parent, and `Association` is the engine's enum number, where **2 is global** (0 is layer, 1 is blend), although the
-function's default argument is 0. Called with the default it just returns `False` for a global switch.
+**Static switches need the engine patch.** The importer uses our patched
+`MaterialEditingLibrary.SetMaterialInstanceStaticSwitchParameterValue` (see [the guide](../../map-making/guide.md) §3).
+Stock 4.27 lets Python read switches but not set them. Without the patch, check the report and set those switches by hand.
 
-Check an export against an editor copy (the ITR-SDK, say):
+If you call that function yourself, there are two details to watch:
+
+- The parent must declare the parameter.
+- `Association` uses the engine's enum numbers: **2 is global**, 0 is layer and 1 is blend. The function defaults to 0,
+  so leaving it out for a global switch makes the call return `False`.
+
+### Optional: compare with an existing editor copy
+
+To compare the export with an editor asset, such as the ITR-SDK's copy, run:
 ```bat
 python compare_editor_copy.py exports\Mi_LandscapeV6_Swamp.json <sdk>\Content\ART2\WorldMaterials\MaterialInstans\Mi_LandscapeV6_Swamp.uasset --uassetgui UAssetGUI.exe
 ```
 
 ## What's tested
+
 | Part | Tested? |
 |---|---|
 | Reading 2.7.2 instances and masters: parent, scalar / vector / texture parameters, static switches, overrides, material layer stacks, master settings and cached parameters, texture settings | **Yes, offline.** 230 instances and 70 masters from the unpacked 2.7.2 game that also exist in the ITR-SDK were compared with the SDK's editor copies (see below) |
@@ -94,18 +115,22 @@ the SDK; compared by value with `compare_editor_copy.py`):
 - **Masters:** 63 of 70 declare exactly the parameters (and have the settings) of the SDK's rebuild. The other 7 declare
   parameters the SDK's rebuild doesn't, which fits the SDK's masters being reconstructions.
 
-So the cooked data is consistent with the SDK where the SDK has anything, and it has more.
+These comparisons give us confidence in the exported values. Where the SDK keeps a value, the cooked data largely
+agrees with it; the cooked files also retain settings that the SDK copies are missing.
 
 ## Limits
-- ITR 2.7.2 packages only so far; others (4.26 and a different engine) untried.
+
+- We've only tested ITR 2.7.2 packages. Other versions, including 4.26 and other engines, are untried.
 - Properties the reader doesn't know come out as raw bytes or are left out. Expression inputs on masters are skipped.
-- The reader only reads cooked game files. Packages saved by an editor have a different header and are refused with a message.
+- The reader expects cooked game files. If you give it a package saved by an editor, its different header is
+  recognised and the tool explains why it can't read it.
 - Texture parameters point at game textures. The script uses a texture already in the project (SDK copy) at the same
   path, else makes a 4x4 flat placeholder with the original's compression and sRGB. It doesn't extract real textures.
 - Per-layer parameters (`LayerParameter` / `BlendParameter` association, used by the `ML_`/`MLI_` layered materials)
   are exported but can't be set from Python.
 
 ## Licence
+
 AGPL-3.0 like the rest of itr-common ([`../../LICENSE`](../../LICENSE)). The scripts contain no game data and the
 exports contain only names, numbers and asset paths, but treat an export as derived from the game: don't publish a
 folder of them as if it were yours.

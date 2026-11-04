@@ -175,12 +175,6 @@ function M.FromPlace(Kv)
     if not IsPkg(A.Level) then return nil, "place " .. A.Name .. ": 'level' must be a package path like /Game/Mods/MyAddon/L_MyAddon" end
     if not IsPkg(A.Target) then return nil, "place " .. A.Name .. ": 'target' must be a stock level package like /Game/ITR/Levels/Hub/L_Hub" end
     if A.Level:lower() == A.Target:lower() then return nil, "place " .. A.Name .. ": 'level' and 'target' are the same package" end
-    if Kv.notify ~= nil then
-        -- "verb:sub": when the add-on level is shown, the console command "verb sub <entry name>" is run
-        local V, Sub = tostring(Kv.notify):match("^([%w_]+):([%w_]+)$")
-        if not V then return nil, "place " .. A.Name .. ": 'notify' must look like verb:sub (letters, digits, _), got '" .. tostring(Kv.notify) .. "'" end
-        A.Notify = V .. " " .. Sub
-    end
     return A
 end
 

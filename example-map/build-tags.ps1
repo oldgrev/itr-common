@@ -7,8 +7,7 @@
   when it loads: Continue opens the Hub and whatever you left in the map is gone.
 
   The game reads every tag ini under IntoTheRadius/Config/Tags/ at startup. So this writes a one-line tag ini and packs it
-  with the mount point ../../../IntoTheRadius/Config/Tags/. Put the pak next to the map pak (Content\Paks or
-  Content\Paks\~mods). The tag must be the loader's NativeTag for the map (default Level.Zone.<Name>).
+  with the mount point ../../../IntoTheRadius/Config/Tags/. Put the pak next to the map pak (Content\Paks\~mods). The tag must be the loader's NativeTag for the map (default Level.Zone.<Name>).
 
   The ini's file name is <Map>LevelTags.ini on purpose. A pak file at the same path as a game file replaces it, so never
   call it LevelGameplayTags.ini: that is the game's list of level tags, and replacing it would unregister every level.
@@ -48,6 +47,8 @@ Write-Host "Tag $Tag -> $Pak"
 
 if ($Install) {
     if (Get-Process "IntoTheRadius-Win64-Shipping" -ErrorAction SilentlyContinue) { throw "Close the game first (paks are mounted at startup)." }
-    Copy-Item $Pak (Join-Path $GameDir "IntoTheRadius\Content\Paks") -Force
-    Write-Host "Installed -> $GameDir\IntoTheRadius\Content\Paks\$PakName"
+    $Mods = Join-Path $GameDir "IntoTheRadius\Content\Paks\~mods"
+    New-Item -ItemType Directory -Force $Mods | Out-Null
+    Copy-Item $Pak $Mods -Force
+    Write-Host "Installed -> $Mods\$PakName"
 }
