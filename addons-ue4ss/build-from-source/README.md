@@ -5,7 +5,7 @@ ITRLevelAddons' work is done by two logic-only Blueprints (no mesh, no collision
 
 | File | What it is |
 |---|---|
-| [`../prebuilt/ITRLevelAddons_P.pak`](../prebuilt/) | The two Blueprints and a level that keeps them in the pak, built. Install it in `<game>\IntoTheRadius\Content\Paks\~mods\`. |
+| [`../prebuilt/zzz_ITRMap_ITRLevelAddons_P.pak`](../prebuilt/) | The two Blueprints and a level that keeps them in the pak, built. Install it in `<game>\IntoTheRadius\Content\Paks\~mods\`. |
 | `Specs/BP_ITRLevelAddon.json`, `Specs/BP_ITRLevelAddons.json` | The Blueprints as BPGen specs (nodes and links as data). Format: [`SPEC.md`](../../../itr-showcase/project/Plugins/ItrShowcaseEditor/SPEC.md). |
 | `Scripts/gen_addons.py` | The readable source of the specs. `python gen_addons.py` (any Python 3; `bpb.py` beside it is its helper) rewrites both. |
 | `Scripts/build_addons.py` | An editor script that turns the specs into the Blueprints and the level `/Game/Mods/ITRLevelAddons/L_ITRLevelAddons`. |
@@ -23,7 +23,6 @@ This needs the full map-making setup in the [map-making guide](../../map-making/
 |---|---|---|
 | `python gen_addons.py` | Run with a plain Python 3 | Wrote both specs (131 and 34 nodes) |
 | `build_addons.py` in the editor | The ITR Showcase project in this repository, run **headless** (`UE4Editor-Cmd.exe ... -run=pythonscript -nullrhi -unattended -nohmd`); not through the menu | `OK` for both Blueprints, 0 errors |
-| `build-map.ps1 -Map ITRLevelAddons` | Run through the repository's cook tool | Wrote the pak; `prebuilt/ITRLevelAddons_P.pak` is a copy of it |
+| `build-map.ps1 -Map ITRLevelAddons` | Run through the repository's cook tool | Wrote the pak; `prebuilt/zzz_ITRMap_ITRLevelAddons_P.pak` is a copy of it |
 | What the Blueprints do in the game | See "What was tested" in [`../README.md`](../README.md) | Streaming, switching, transform, hides: seen |
-| Installing the pak in `~mods` as `ITRLevelAddons_P.pak` | The runs used the name `zzz_ITRMap_ITRLevelAddons_P.pak` in `~mods` | Not run as written (the name) |
 | Setting up the project (special editor, plugin build) | Not run: the project used here was already set up | Not tried |

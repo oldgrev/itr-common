@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "name": "Example",
+  "level": "/Game/Mods/Example/L_Example",
+  "start": { "x": -3000, "y": -600000, "z": 20, "yaw": 0 },
+  "triggers": [
+    { "kind": "regions" }
+  ]
+}

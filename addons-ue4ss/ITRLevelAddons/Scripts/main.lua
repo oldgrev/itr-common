@@ -2,7 +2,7 @@
 -- and hides named actors of the stock level. One JSON manifest per add-on in this mod's Addons folder (or "itraddons place" from another mod);
 -- any number of add-ons (from any number of mods) stack, each in its own streaming entry. See README.md.
 --
--- Blueprint first: the Blueprints in ITRLevelAddons_P.pak do the work (BP_ITRLevelAddon: the streaming entry, the follow-the-target switching and the hiding;
+-- Blueprint first: the Blueprints in zzz_ITRMap_ITRLevelAddons_P.pak do the work (BP_ITRLevelAddon: the streaming entry, the follow-the-target switching and the hiding;
 -- BP_ITRLevelAddons: the manager that makes them). This file only lists the manifests (no Blueprint can read a file), makes the manager once, hands it every
 -- add-on, finds ITRMapLoader's manager and does the same for the levels it asked for, and answers "itraddons place". After that it does nothing:
 -- no timer, no loop, no hook, and its one ExecuteInGameThread is made from the game mode notification.
@@ -240,7 +240,7 @@ local function Step()
     if Stepped then return end
     Stepped = true
     local Mgr = SpawnManager()
-    if not Mgr then Log("helper pak not found (%s): nothing is streamed. Install ITRLevelAddons_P.pak.", MANAGER_PATH); return end
+    if not Mgr then Log("helper pak not found (%s): nothing is streamed. Install zzz_ITRMap_ITRLevelAddons_P.pak.", MANAGER_PATH); return end
     for _, A in ipairs(Addons) do PlaceOne(Mgr, A) end
     TakeLoaderRequests(Mgr)
     Log("ready: %d add-on(s) placed", #Addons)

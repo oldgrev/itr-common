@@ -17,7 +17,7 @@ What you place in the editor (the names are what you write in the form; letters,
 3. **Pack them.** In `example-map/` run `.\build-map.ps1 -Engine "<your editor>\Engine" -Map MyMap` (pak `zzz_ITRMap_MyMap_P.pak`) and in `example-addon/`
    `.\build-map.ps1 -Engine "<your editor>\Engine" -Map MyMapHub` (pak `zzz_ITRAddon_MyMapHub_P.pak`); both scripts pack only `/Game/Mods/<Map>`. Put the paks in `<game>\IntoTheRadius\Content\Paks\~mods\`.
 4. **Install what makes it work** (all in [`loader-ue4ss/`](../loader-ue4ss/) and [`addons-ue4ss/`](../addons-ue4ss/)): the `ITRMapLoader` and `ITRLevelAddons` folders into the UE4SS mods
-   folder, and `loader-ue4ss/prebuilt/ITRMapLoader_P.pak` and `addons-ue4ss/prebuilt/ITRLevelAddons_P.pak` into `<game>\IntoTheRadius\Content\Paks\~mods\`.
+   folder, and `loader-ue4ss/prebuilt/zzz_ITRMap_ITRMapLoader_P.pak` and `addons-ue4ss/prebuilt/zzz_ITRMap_ITRLevelAddons_P.pak` into `<game>\IntoTheRadius\Content\Paks\~mods\`.
    Put `MyMap.json` into `<game>\IntoTheRadius\Content\Paks\ITRMaps\`.
 5. Start the game and go to the Hub. `<game>\IntoTheRadius\Content\Paks\UE4SS.log`, lines starting `[ITRMapLoader]`, say what was found and what was not.
 

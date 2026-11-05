@@ -129,7 +129,7 @@ You have three ways to enter a map. Choose whichever suits your setup:
 - **A key.** `Key` enters from the Hub and leaves from the map. The default F10 is one no common ITR mod uses; avoid F5
   to F7.
 - **A console command.** `itrmap enter` / `itrmap leave`. A command that names a map this loader doesn't have is left
-  for other handlers.
+  for other handlers. Another mod can send it with `ExecuteConsoleCommand`. Typing it by hand needs the UE4SS console, which is off in the release archives' `UE4SS-settings.ini` (`ConsoleEnabled = 0`, `GuiConsoleEnabled = 0`). To type commands, set `ConsoleEnabled = 1` and `GuiConsoleEnabled = 1` in `UE4SS-settings.ini`; I haven't run that with this ini.
 
 ### Getting out
 Put a `TargetPoint` tagged `itr:exit` in the map where people can leave, with something visible on it (the example uses a
@@ -337,7 +337,7 @@ Unknown fields and bad triggers are logged and skipped; the rest of the file and
 
 * `collision`: the player's **body** walks into the object (a trigger box is the usual choice). It suits a new room or a new path out. The loader changes nothing on your object; a hand reaching in does not fire it; it fires once per entry and again only after the player has left. A player who arrives (or is moved) standing inside it does not trigger it. A solid mesh blocks the player, so it never overlaps: the log says so.
 * `grab`: the player grabs the object. **Making it grabbable is your part**: place a `GrippableStaticMeshActor` (or a `GrippableActor` / `GrippableSkeletalMeshActor`), which needs the VRExpansion plugin in your project. Give it the grip tags `Grip.Trigger.IndexGrip` and `Grip.NoDistanceGrip` and a collision preset that overlaps the Hand channel, such as `Drawer` (`BlockAll` ignores the hand). Other tags are untested. If it is not grippable the log says "found but not grippable" and nothing happens; nothing is substituted. The hand's feel (pose, latch) has not been checked in VR.
-* Both bind to your object without a Blueprint of yours. ITRMapLoader's helper pak (`ITRMapLoader_P.pak`, logic-only Blueprints with no mesh and no collision) does the binding and everything that follows a trigger.
+* Both bind to your object without a Blueprint of yours. ITRMapLoader's helper pak (`zzz_ITRMap_ITRMapLoader_P.pak`, logic-only Blueprints with no mesh and no collision) does the binding and everything that follows a trigger.
 
 ### What goes wrong, and what you see
 Nothing is shown to the player. Every case is one line in `Content/Paks/UE4SS.log`; look for `[ITRMapLoader]`:
@@ -373,9 +373,9 @@ Hub computer. A trigger that targets another custom map is not supported.
 
 ### What the player installs
 - UE4SS (see "Installing" above) and the `ITRMapLoader` folder (this directory) in the UE4SS mods folder;
-- [`prebuilt/ITRMapLoader_P.pak`](prebuilt/) in `<game>\IntoTheRadius\Content\Paks\~mods\` (the trigger helper; see [`build-from-source/`](build-from-source/));
+- [`prebuilt/zzz_ITRMap_ITRMapLoader_P.pak`](prebuilt/) in `<game>\IntoTheRadius\Content\Paks\~mods\` (the trigger helper; see [`build-from-source/`](build-from-source/));
 - your map's pak(s) in `<game>\IntoTheRadius\Content\Paks\~mods\` and `MyMap.json` in `<game>\IntoTheRadius\Content\Paks\ITRMaps\`;
-- for `level` triggers only: the `ITRLevelAddons` folder and [`../addons-ue4ss/prebuilt/ITRLevelAddons_P.pak`](../addons-ue4ss/prebuilt/) in `~mods` ([`../addons-ue4ss/`](../addons-ue4ss/)).
+- for `level` triggers only: the `ITRLevelAddons` folder and [`../addons-ue4ss/prebuilt/zzz_ITRMap_ITRLevelAddons_P.pak`](../addons-ue4ss/prebuilt/) in `~mods` ([`../addons-ue4ss/`](../addons-ue4ss/)).
 
 Without ITRMapLoader the form does nothing and nothing else changes.
 
@@ -426,11 +426,11 @@ With Lua 5.1 (`lua.exe`, `luac.exe`), from `tests\`: `luac -p ..\ITRMapLoader\Sc
 spawned, written and started, the handshake with ITRLevelAddons in both orders, config Regions rows, no queued call; 22 cases), against stand-ins of the UE4SS API. They prove the logic around the game, not the game.
 
 ## The Blueprints
-The logic of a form map is in four Blueprints, provided built (`prebuilt/ITRMapLoader_P.pak`); `build-from-source/` has their specs and how to rebuild them.
+The logic of a form map is in four Blueprints, provided built (`prebuilt/zzz_ITRMap_ITRMapLoader_P.pak`); `build-from-source/` has their specs and how to rebuild them.
 
 ## What has been run
 Everything above that is not listed here as run has **not** been run. "Run" means: the game started with an emulated headset driving it (UE4SS 3.0.1, 4 November 2026) with the helper pak in
-`Content/Paks/~mods`, or the person's session in the next section. The final build of the helper pak (`prebuilt/ITRMapLoader_P.pak`) and of `forms.lua` and `regions.lua` ran in one session; the
+`Content/Paks/~mods`, or the person's session in the next section. The helper pak (`prebuilt/zzz_ITRMap_ITRMapLoader_P.pak`) was rebuilt on 5 November 2026 (Regions row press handler, add-on and entry scale, key release) and **has not been run in the game yet**; the earlier build of it and of `forms.lua` and `regions.lua` ran in one session. The
 later offline changes (a config map's Regions row, `boot.lua` taking the config maps, the removal of `maps.lua` and `bind.lua`) were **not run in the game**.
 
 | Claim in this README | Checked | Result |
@@ -447,7 +447,6 @@ later offline changes (a config map's Regions row, `boot.lua` taking the config 
 | Saves in a form map, a save made inside a map then Continue, quit to menu then Continue | Not run | **Not run** (a test would write a save) |
 | Six visits in a row, ten forms at once | Planned for a last session that was stopped | **Not run** (four arrivals and two form maps were) |
 | The config route (`config.lua` map) to its exit marker | Earlier runs only; not with the final build | **Not run in the final state** |
-| Installing `prebuilt/ITRMapLoader_P.pak` into `Content/Paks/~mods/` | The pak was installed in `~mods` under the name `zzz_ITRMap_ITRMapLoader_P.pak`; the location is the one written here, the file name is not | Not run as written |
 | `build-tags.ps1`, `build-map.ps1 -Install` | Not run after they were changed to install into `~mods` (a cook is needed) | **Not run** |
 
 ## Run by a person in VR (4 November 2026)

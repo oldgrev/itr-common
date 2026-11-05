@@ -59,7 +59,7 @@ We'll see how that all works out anyway.
 
 Everything is in [`BulletPenetration/Scripts/config.lua`](BulletPenetration/Scripts/config.lua) and is read at game start. `Scale` multiplies the budget; the rest are the numbers above (`BudgetK`, `MinSpeed`, `MinExitSpeed`, `MaxPenetrations`, `DamageFloor`, `SheetThicknessCm`, `UnmarkedResistance` and so on), each commented. `PlayerOnly = true` limits it to your bullets.
 
-For a quick experiment, use the UE4SS console. These changes last only for the current game session:
+The usual way to tune is `config.lua`. For a quick experiment there are console commands, but the UE4SS console is off in the `UE4SS-settings.ini` the release archives and the Showcase carry (`ConsoleEnabled = 0`, `GuiConsoleEnabled = 0`). To type commands, set `ConsoleEnabled = 1` and `GuiConsoleEnabled = 1` in `UE4SS-settings.ini`; I haven't run that with this ini. These changes last only for the current game session:
 
 - `bpen scale <x>` sets the scale; `bpen up` doubles it, `bpen down` halves it, `bpen off` sets it to 0.
 

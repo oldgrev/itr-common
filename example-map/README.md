@@ -8,6 +8,8 @@ The [loader](../loader-ue4ss/)'s `config.lua` has this map's entry as a commente
 (the item with the static mesh `SM_Tea01D`) and you go through the game's transition onto this map; step on the exit pad
 and you come back to the Hub the same way.
 
+The map also comes with a map form, [`prebuilt/Example.json`](prebuilt/Example.json), the other way in: with it in `Content\Paks\ITRMaps\`, the map is listed on the Hub computer's REGIONS page and needs no `config.lua` edit. It names the map, its level and the start position, and lists the map on REGIONS. It adds no way out: the exit pad only works with the config block, so with the form you leave by loading a save made before entering. A form can add a way out with an `exit` trigger; see [`../loader-ue4ss/README.md`](../loader-ue4ss/README.md). Use the form or the config block, not both: both register the name `Example`. **The form has not been run in the game yet.**
+
 The checker floor also gives you a quick way to check your editor setup. Its material, `M_ExampleGrid`, is compiled
 by your editor. With the patched editor, it shows up properly in game. Stock 4.27 would compile it in a form that
 crashes the game or draws black.
@@ -23,7 +25,7 @@ For the editor setup and the full walkthrough, see [`../map-making/guide.md`](..
 SHA-256 `a4b5eccd579f981e4d02ed7051d48e32c37d7ae1e017d3a7d9c37786e5b17dfc`). Next to it is
 [`prebuilt/zzz_ITRMap_Example_Tags_P.pak`](prebuilt/) (692 bytes, SHA-256
 `ce3e37b2cddc85ae184de290b49c50b9d570a8b2a597648d82a156c1639c3f15`), the level tag pak. Install both, and delete both to
-uninstall. The steps for installing UE4SS, the loader and the paks are at the top of
+uninstall. For the form route, also put [`prebuilt/Example.json`](prebuilt/Example.json) into `<game>\IntoTheRadius\Content\Paks\ITRMaps\` (create the folder if it isn't there); ITRMapLoader needs to be installed, and no `config.lua` edit is needed. The steps for installing UE4SS, the loader and the paks are at the top of
 [the main README](../README.md#example-map-test).
 
 ## Building it yourself
@@ -68,6 +70,7 @@ editor by hand), and pass `-Map <Name>` to `build-map.ps1` (plus `-Tag <your Nat
 - In VR, loaded from the Hub with the UE4SS script: the checker floor looks right, you land on the start marker, three
   enemies we spawned 40 m away stood on the navmesh, and the exit pad took us back to the Hub and unloaded the map.
 - We haven't tried building it with stock 4.27.2 (`OWN_MATERIAL = False`).
+- The map form `prebuilt/Example.json` has not been run in the game.
 
 ## What a map needs for native entry
 

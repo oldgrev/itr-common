@@ -2203,7 +2203,7 @@ local function NativeAttempt()
     end
 end
 
--- A save made in a map (NativeSaves on) loads the map's level through the game's own Continue: no transfer was started here, so this adopts it as
+-- A save made in a map (NativeSaves on) loads the map's level through the game's Continue: no transfer was started here, so this adopts it as
 -- the Showcase loader does: exits armed (for a form map: its exit triggers bound), a guard against a bad saved position. Called from the level events.
 -- Run once, inline, from the level event that adopts the save (no timer: a position that is only bad later is not caught).
 local function NativeGuardPosition(Map, S)

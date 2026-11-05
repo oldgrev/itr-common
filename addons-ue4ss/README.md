@@ -7,7 +7,7 @@ level it belongs to. While that level is visible in the game, the add-on is stre
 unloads (you go through the zone transfer, back to the main menu), the add-on unloads with it. You can install any number of add-ons from different authors at once. Each loads in and ends up merged,
 so you do not need a modified copy of the Hub or a way to merge everyone's changes.
 
-**It needs one small helper pak** ([`prebuilt/ITRLevelAddons_P.pak`](prebuilt/), two logic-only Blueprints; their specs and how to rebuild them are in [`build-from-source/`](build-from-source/)). The Blueprints do the work (the streaming entry, switching the add-on on and off with its target level, hiding stock actors); this Lua only lists the manifests, makes the manager once and hands it every add-on. Nothing polls: no timer, no loop, no hook, and the mod's one `ExecuteInGameThread` is made from the game mode notification. Without the pak the mod logs `helper pak not found` and does nothing.
+**It needs one small helper pak** ([`prebuilt/zzz_ITRMap_ITRLevelAddons_P.pak`](prebuilt/), two logic-only Blueprints; their specs and how to rebuild them are in [`build-from-source/`](build-from-source/)). The Blueprints do the work (the streaming entry, switching the add-on on and off with its target level, hiding stock actors); this Lua only lists the manifests, makes the manager once and hands it every add-on. Nothing polls: no timer, no loop, no hook, and the mod's one `ExecuteInGameThread` is made from the game mode notification. Without the pak the mod logs `helper pak not found` and does nothing.
 
 The first target is the Hub. An example add-on (a Hub container room on a roof, with a working ladder up to it) is in
 [`../example-addon/`](../example-addon/).
@@ -21,7 +21,7 @@ In the game (an emulated headset driving the game, UE4SS 3.0.1, 4 November 2026)
 - Hide lists: an actor in the Hub level and an actor in a sublevel of the Hub (`L_Hub_BaseBuilding`) were hidden with collision off, and stayed hidden after returning from a zone.
 - Together with ITRMapLoader in one session: the add-on and the loader's trigger-level requests both worked.
 
-Not run: a manifest `rotation`, `scale` other than `[1, 1, 2]`, a second add-on, `itraddons place` from another mod's console, a target that is not a stock Hub level, and installing the helper pak under its documented name `ITRLevelAddons_P.pak` (the runs used `zzz_ITRMap_ITRLevelAddons_P.pak`; the folder is the one written here).
+Not run: a manifest `rotation`, `scale` other than `[1, 1, 2]`, a second add-on, `itraddons place` from another mod's console, a target that is not a stock Hub level.
 
 ## Installing
 1. **UE4SS** 3.0.1 (the build in [the loader README](../loader-ue4ss/README.md#installing) works; so does the standard
@@ -32,7 +32,7 @@ Not run: a manifest `rotation`, `scale` other than `[1, 1, 2]`, a second add-on,
 
    The empty `enabled.txt` turns it on. If your `Mods\mods.txt` lists mods, you can add `ITRLevelAddons : 1` there too;
    a mod with `enabled.txt` that `mods.txt` doesn't mention is started anyway.
-3. Put the helper pak [`prebuilt/ITRLevelAddons_P.pak`](prebuilt/) into `<game>\IntoTheRadius\Content\Paks\~mods\` (create `~mods` if it isn't there).
+3. Put the helper pak [`prebuilt/zzz_ITRMap_ITRLevelAddons_P.pak`](prebuilt/) into `<game>\IntoTheRadius\Content\Paks\~mods\` (create `~mods` if it isn't there).
 4. For each add-on: its manifest (`<Name>.json`) goes into `ITRLevelAddons\Addons\`, its pak (`zzz_ITRAddon_<Name>_P.pak`)
    into `<game>\IntoTheRadius\Content\Paks\~mods\`.
 5. Start the game and Continue.
@@ -115,7 +115,7 @@ itraddons place name=MyAddon_1 level=/Game/Mods/MyMod/L_MyAddon target=/Game/ITR
 ```
 `name`, `level` and `target` are required and checked like a manifest's. The command places the same add-on a manifest does. A name already in use, or the same level and target under
 another name, is refused and logged. Send it after the game has started (at a level event), not at mod start. There is no `notify` any more: a mod that needs to know when its level is
-shown can bind its own Blueprint to the level's streaming entry (`ITRAddon_<name>`) instead.
+shown can bind its own Blueprint to the level's streaming entry (`ITRAddon_<name>`) instead. Another mod sends the command with `ExecuteConsoleCommand`. Typing it by hand needs the UE4SS console, which is off in the release archives' `UE4SS-settings.ini` (`ConsoleEnabled = 0`, `GuiConsoleEnabled = 0`). To type commands, set `ConsoleEnabled = 1` and `GuiConsoleEnabled = 1` in `UE4SS-settings.ini`; I haven't run that with this ini.
 
 ITRMapLoader does not use this command: when both are installed, whichever starts second hands the add-on requests to the other directly, so start order does not matter.
 
@@ -139,7 +139,7 @@ If something is missing or does not load, look for these messages:
 - `add-on <name>: hide <level>:PersistentLevel.<actor> matches no actor of its level`: check the actor name (said once, only when the hide's level is shown).
 - `add-on <name>: already placed (...): ignored`: a repeated name, or the same level and target as another add-on.
 - `add-on <name>: level could not be loaded: <package>`: the add-on's pak is not installed or the package path is wrong.
-- `helper pak not found`: install `ITRLevelAddons_P.pak` in `Content/Paks/~mods`.
+- `helper pak not found`: install `zzz_ITRMap_ITRLevelAddons_P.pak` in `Content/Paks/~mods`.
 
 ## Limits
 - A `target` that never appears is **not logged**: without a timer a target that is not there yet cannot be told from one that never will be, so the add-on just waits and binds when the target's streaming entry exists. Check the `target` against `/Game/ITR/Levels/...` yourself.

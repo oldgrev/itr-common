@@ -12,7 +12,7 @@ and the Regions page. Lua reads the forms (no Blueprint can read a file), spawns
 
 | File | What it is |
 |---|---|
-| [`../prebuilt/ITRMapLoader_P.pak`](../prebuilt/) | The four Blueprints and a level that keeps them in the pak, built. Install it in `<game>\IntoTheRadius\Content\Paks\~mods\`. |
+| [`../prebuilt/zzz_ITRMap_ITRMapLoader_P.pak`](../prebuilt/) | The four Blueprints and a level that keeps them in the pak, built. Install it in `<game>\IntoTheRadius\Content\Paks\~mods\`. |
 | `Specs/BP_ITRMapEntry.json`, `BP_ITRTrigger.json`, `BP_ITRMapManager.json`, `BP_ITRRegions.json` | The Blueprints as BPGen specs. Format: [`SPEC.md`](../../../itr-showcase/project/Plugins/ItrShowcaseEditor/SPEC.md). |
 | `Scripts/gen_entry.py`, `gen_trigger.py`, `gen_regions.py` | The readable sources of the specs (`bpb.py` is their helper). Any Python 3, nothing else needed. |
 | `Scripts/build_loader.py` | An editor script that turns the specs into the Blueprints and the level `/Game/Mods/ITRMapLoader/L_ITRMapLoader`. |
@@ -30,7 +30,6 @@ This needs the full map-making setup in the [map-making guide](../../map-making/
 |---|---|---|
 | The three `gen_*.py` | Run with a plain Python 3 | Wrote the specs (entry 173, trigger 271, manager 11, regions 112 nodes) |
 | `build_loader.py` in the editor | The ITR Showcase project in this repository (`VRExpansionPlugin` already in it, plugin compiled), run **headless** (`UE4Editor-Cmd.exe ... -run=pythonscript -nullrhi -unattended -nohmd`) | `OK` for all four Blueprints, 0 errors |
-| `build-map.ps1 -Map ITRMapLoader` | Run through the repository's cook tool | Wrote the pak (96,516 bytes); `prebuilt/ITRMapLoader_P.pak` is a copy |
+| `build-map.ps1 -Map ITRMapLoader` | Run through the repository's cook tool | Wrote the pak (98,265 bytes, rebuilt 5 November 2026 after the Regions press-handler and scale fixes; not yet run in the game); `prebuilt/zzz_ITRMap_ITRMapLoader_P.pak` is a copy |
 | What the Blueprints do in the game | See "What has been run" in [`../README.md`](../README.md) | Entries, exits, return points, `to`/`at`, Regions page and rows (by test event): seen. A laser press and a hand grab: not run |
-| Installing the pak in `~mods` as `ITRMapLoader_P.pak` | The runs used the name `zzz_ITRMap_ITRMapLoader_P.pak` in `~mods` | Not run as written (the name) |
 | Setting up the project (special editor, plugin build, `VRExpansionPlugin`) | Not run: the project used here was already set up | Not tried |
